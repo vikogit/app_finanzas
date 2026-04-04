@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nuevo Movimiento</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            padding: 40px;
+        }
+
+        .contenedor {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            margin-bottom: 25px;
+        }
+
+        .grupo {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="date"],
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .segmentado {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .segmentado input[type="radio"] {
+            display: none;
+        }
+
+        .segmentado label {
+            padding: 10px 16px;
+            border: 1px solid #ccc;
+            border-radius: 999px;
+            cursor: pointer;
+            background-color: #f8f8f8;
+            font-weight: normal;
+        }
+
+        .segmentado input[type="radio"]:checked + label {
+            background-color: #1f3b5b;
+            color: white;
+            border-color: #1f3b5b;
+        }
+
+        button {
+            background-color: #1f3b5b;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            opacity: 0.95;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor">
+        <h1>Nuevo Movimiento</h1>
+
+        <form method="POST">
+            <div class="grupo">
+                <label for="fecha">Fecha</label>
+                <input type="date" id="fecha" name="fecha">
+            </div>
+
+            <div class="grupo">
+                <label>Tipo</label>
+                <div class="segmentado">
+                    <input type="radio" id="gasto" name="tipo" value="Gasto" checked>
+                    <label for="gasto">Gasto</label>
+
+                    <input type="radio" id="ingreso" name="tipo" value="Ingreso">
+                    <label for="ingreso">Ingreso</label>
+                </div>
+            </div>
+
+            <div class="grupo">
+                <label>Categoría</label>
+                <div class="segmentado">
+                    <input type="radio" id="colchon" name="categoria" value="Colchón" checked>
+                    <label for="colchon">Colchón</label>
+
+                    <input type="radio" id="necesidades" name="categoria" value="Necesidades">
+                    <label for="necesidades">Necesidades</label>
+
+                    <input type="radio" id="diversion" name="categoria" value="Diversión">
+                    <label for="diversion">Diversión</label>
+
+                    <input type="radio" id="inversion" name="categoria" value="Inversión">
+                    <label for="inversion">Inversión</label>
+                </div>
+            </div>
+
+            <div class="grupo">
+                <label for="descripcion">Descripción</label>
+                <input type="text" id="descripcion" name="descripcion" placeholder="Ejemplo: fruta, pasajes, interés, ahorro...">
+            </div>
+
+            <div class="grupo">
+                <label for="importe">Importe</label>
+                <input type="number" id="importe" name="importe" step="0.01" placeholder="Ejemplo: 60 o 18.75">
+            </div>
+
+            <button type="submit">Guardar movimiento</button>
+        </form>
+    </div>
+
+    <script>
+        const fechaInput = document.getElementById("fecha");
+        const hoy = new Date().toISOString().split("T")[0];
+        fechaInput.value = hoy;
+    </script>
+
+</body>
+</html>

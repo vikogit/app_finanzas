@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Financiero</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            padding: 40px;
+            margin: 0;
+        }
+
+        .contenedor {
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #1f2937;
+        }
+
+        .subtitulo {
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+
+        .tarjetas {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .tarjeta {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .tarjeta h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #6b7280;
+        }
+
+        .tarjeta p {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .ingresos p {
+            color: #16a34a;
+        }
+
+        .gastos p {
+            color: #dc2626;
+        }
+
+        .balance p {
+            color: #1f3b5b;
+        }
+
+        .acciones {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .acciones h2 {
+            margin-top: 0;
+            color: #1f2937;
+        }
+
+        .botones {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 18px;
+            background-color: #1f3b5b;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            opacity: 0.92;
+        }
+
+        .btn-secundario {
+            background-color: #374151;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor">
+        <h1>📈 Dashboard Financiero</h1>
+        <p class="subtitulo">Resumen general de tus movimientos registrados</p>
+
+        <div class="tarjetas">
+            <div class="tarjeta ingresos">
+                <h3>Total ingresos</h3>
+                <p>S/ {{ "%.2f"|format(total_ingresos) }}</p>
+            </div>
+
+            <div class="tarjeta gastos">
+                <h3>Total gastos</h3>
+                <p>S/ {{ "%.2f"|format(total_gastos) }}</p>
+            </div>
+
+            <div class="tarjeta balance">
+                <h3>Balance</h3>
+                <p>S/ {{ "%.2f"|format(balance) }}</p>
+            </div>
+        </div>
+
+        <div class="acciones">
+            <h2>Acciones rápidas</h2>
+            <div class="botones">
+                <a href="/nuevo" class="btn">➕ Registrar movimiento</a>
+                <a href="/movimientos" class="btn btn-secundario">📋 Ver movimientos</a>
+                <a href="/logout" class="btn" style="background:#dc2626;">
+                🚪 Cerrar sesión
+                </a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
