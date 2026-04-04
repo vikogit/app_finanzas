@@ -3,12 +3,15 @@ from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from datetime import datetime
 from functools import wraps
+import os
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-USUARIO_ADMIN = "viko"
-PASSWORD_ADMIN = "Viko29062000/*.app_finanzas"
+
+
+USUARIO_ADMIN = os.getenv("APP_USER")
+PASSWORD_ADMIN = os.getenv("APP_PASSWORD")
 
 db = SQLAlchemy(app)
 
