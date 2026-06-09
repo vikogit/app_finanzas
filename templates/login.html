@@ -1,83 +1,144 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión — App Finanzas</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: { fontFamily: { inter: ['Inter', 'sans-serif'] } }
-            }
-        }
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión — App Finanzas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>(function(){ if(localStorage.getItem('theme')!=='light') document.documentElement.classList.add('dark'); })();</script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #f1f5f9;
+      --card:      #ffffff;
+      --border:    rgba(0,0,0,0.07);
+      --text:      #0f172a;
+      --muted:     #64748b;
+      --input-bg:  #f1f5f9;
+      --input-br:  rgba(0,0,0,0.10);
+    }
+    html.dark {
+      --bg:        #060610;
+      --card:      rgba(255,255,255,0.04);
+      --border:    rgba(255,255,255,0.08);
+      --text:      #f1f5f9;
+      --muted:     rgba(255,255,255,0.45);
+      --input-bg:  rgba(255,255,255,0.07);
+      --input-br:  rgba(255,255,255,0.10);
+    }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* blobs */
+    .blobs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .blob { position: absolute; border-radius: 50%; filter: blur(90px); }
+    .blob-1 { width: 620px; height: 620px; background: radial-gradient(circle,#c2410c,#7c2d12); top:-220px; right:-100px; opacity:0; }
+    .blob-2 { width: 500px; height: 500px; background: radial-gradient(circle,#ea580c,#b45309); top:80px;  right:160px; opacity:0; }
+    .blob-3 { width: 420px; height: 420px; background: radial-gradient(circle,#9f1239,#4c0519); bottom:-80px; left:-80px; opacity:0; }
+    html.dark .blob-1 { opacity: 0.35; }
+    html.dark .blob-2 { opacity: 0.22; }
+    html.dark .blob-3 { opacity: 0.28; }
+
+    .wrap { position: relative; z-index: 1; width: 100%; max-width: 360px; }
+
+    /* Brand */
+    .brand { text-align: center; margin-bottom: 32px; }
+    .brand-icon {
+      width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 12px;
+      background: linear-gradient(135deg,#f97316,#dc2626);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(249,115,22,0.35);
+    }
+    .brand-name { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+    .brand-sub  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px 28px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .form-label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 7px; }
+    .form-field { margin-bottom: 18px; }
+    .form-input {
+      width: 100%; background: var(--input-bg); border: 1px solid var(--input-br);
+      border-radius: 10px; padding: 9px 14px; font-size: 13px; color: var(--text);
+      font-family: inherit; outline: none; transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: #f97316; }
+    .form-input::placeholder { color: rgba(100,116,139,0.5); }
+
+    .alert {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 10px; padding: 10px 12px; font-size: 12px; color: #f87171;
+      margin-bottom: 18px;
+    }
+
+    .btn-submit {
+      width: 100%; padding: 11px;
+      background: #0f172a; color: white; border: none;
+      border-radius: 10px; font-size: 13px; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: opacity 0.15s;
+      letter-spacing: 0.1px;
+    }
+    html.dark .btn-submit { background: linear-gradient(135deg,#f97316,#dc2626); }
+    .btn-submit:hover { opacity: 0.88; }
+  </style>
 </head>
-<body class="font-inter bg-slate-50 min-h-screen flex items-center justify-center p-4">
+<body>
+<div class="blobs" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
 
-    <!-- Decorative blobs -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div class="absolute -top-40 -right-40 w-96 h-96 bg-blue-100 rounded-full opacity-50 blur-3xl"></div>
-        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-100 rounded-full opacity-50 blur-3xl"></div>
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75"/>
+      </svg>
     </div>
+    <div class="brand-name">App Finanzas</div>
+    <div class="brand-sub">Control personal de ingresos y gastos</div>
+  </div>
 
-    <div class="relative w-full max-w-sm">
-
-        <!-- Brand -->
-        <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-14 h-14 bg-slate-900 rounded-2xl mb-4 shadow-lg">
-                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                </svg>
-            </div>
-            <h1 class="text-2xl font-bold text-slate-900">App Finanzas</h1>
-            <p class="text-slate-500 text-sm mt-1">Control personal de ingresos y gastos</p>
-        </div>
-
-        <!-- Card -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-            <h2 class="text-base font-semibold text-slate-800 mb-5">Iniciar sesión</h2>
-
-            {% if error %}
-            <div class="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 mb-5 text-sm" role="alert">
-                <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                </svg>
-                <span>{{ error }}</span>
-            </div>
-            {% endif %}
-
-            <form method="POST" class="space-y-4">
-                <div>
-                    <label for="usuario" class="block text-sm font-medium text-slate-700 mb-1.5">Usuario</label>
-                    <input
-                        type="text" id="usuario" name="usuario" required
-                        placeholder="Tu nombre de usuario"
-                        class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    >
-                </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-slate-700 mb-1.5">Contraseña</label>
-                    <input
-                        type="password" id="password" name="password" required
-                        placeholder="••••••••"
-                        class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    >
-                </div>
-
-                <button
-                    type="submit"
-                    class="w-full mt-1 bg-slate-900 hover:bg-slate-700 active:bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors duration-200 cursor-pointer"
-                >
-                    Entrar
-                </button>
-            </form>
-        </div>
-
+  <div class="card">
+    {% if error %}
+    <div class="alert" role="alert">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:1px">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+      </svg>
+      <span>{{ error }}</span>
     </div>
+    {% endif %}
+
+    <form method="POST" autocomplete="off">
+      <div class="form-field">
+        <label for="usuario" class="form-label">Usuario</label>
+        <input type="text" id="usuario" name="usuario" required
+          placeholder="Tu nombre de usuario" class="form-input" autocomplete="username">
+      </div>
+      <div class="form-field" style="margin-bottom:24px">
+        <label for="password" class="form-label">Contraseña</label>
+        <input type="password" id="password" name="password" required
+          placeholder="••••••••" class="form-input" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-submit">Entrar</button>
+    </form>
+  </div>
+</div>
 </body>
 </html>

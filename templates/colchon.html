@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Colchón — App Finanzas{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1 class="page-title">Colchón de ahorro</h1>
+  <p class="page-sub">Tu fondo de emergencia — ¿está creciendo mes a mes?</p>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">Período</span>
+  <input type="date" id="desde" class="date-input">
+  <span class="filter-sep">→</span>
+  <input type="date" id="hasta" class="date-input">
+  <button class="filter-btn" onclick="applyFilter()">Aplicar</button>
+  <div class="quick-filters">
+    <button class="qf" data-qf="mes"  onclick="setQuickFilter('mes')">Mes</button>
+    <button class="qf" data-qf="3m"   onclick="setQuickFilter('3m')">3M</button>
+    <button class="qf" data-qf="año"  onclick="setQuickFilter('año')">Año</button>
+    <button class="qf" data-qf="todo" onclick="setQuickFilter('todo')">Todo</button>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(34,197,94,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+      </svg>
+    </div>
+    <div class="kpi-label">Neto acumulado</div>
+    <div class="kpi-value" style="color:#22c55e" id="kpi-neto">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(34,197,94,0.1)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25"/>
+      </svg>
+    </div>
+    <div class="kpi-label">Total movido</div>
+    <div class="kpi-value" style="color:#4ade80" id="kpi-total">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(34,197,94,0.08)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#86efac" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/>
+      </svg>
+    </div>
+    <div class="kpi-label">Movimientos</div>
+    <div class="kpi-value" style="color:#86efac" id="kpi-movs">—</div>
+  </div>
+</div>
+
+<div class="charts-grid">
+  <div class="card card-p">
+    <div class="chart-title">
+      Crecimiento acumulado del colchón
+      <span class="chart-badge badge-green">Área</span>
+    </div>
+    <div style="position:relative;height:200px">
+      <canvas id="chartEvol"></canvas>
+    </div>
+  </div>
+  <div class="card card-p">
+    <div class="chart-title">
+      Aportes mensuales
+      <span class="chart-badge badge-green">Barras</span>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Ingresos</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Salidas</div>
+    </div>
+    <div style="position:relative;height:180px">
+      <canvas id="chartAportes"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chartEvol = null, chartAportes = null;
+
+function loadData(desde, hasta) {
+  fetch(`/api/colchon?desde=${desde}&hasta=${hasta}`)
+    .then(r => r.json())
+    .then(data => {
+      const fmt = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+      document.getElementById('kpi-neto').textContent  = fmt(data.kpis.neto);
+      document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
+      document.getElementById('kpi-movs').textContent  = data.kpis.num_movimientos;
+
+      const dark = document.documentElement.classList.contains('dark');
+      const gridColor = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      const tickColor = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+      // Area chart
+      const ctxE = document.getElementById('chartEvol').getContext('2d');
+      if (chartEvol) chartEvol.destroy();
+      const gradE = ctxE.createLinearGradient(0,0,0,200);
+      gradE.addColorStop(0, 'rgba(34,197,94,0.4)');
+      gradE.addColorStop(1, 'rgba(34,197,94,0.02)');
+      chartEvol = new Chart(ctxE, {
+        type: 'line',
+        data: {
+          labels: data.evolucion.map(d => d.mes),
+          datasets: [{
+            label: 'Acumulado',
+            data: data.evolucion.map(d => d.acumulado),
+            borderColor: '#22c55e', borderWidth: 2,
+            backgroundColor: gradE, fill: true,
+            tension: 0.4, pointRadius: 3, pointBackgroundColor: '#22c55e',
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: gridColor }, ticks: { color: tickColor } },
+            y: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+      window._charts.push(chartEvol);
+
+      // Bar chart
+      const ctxA = document.getElementById('chartAportes').getContext('2d');
+      if (chartAportes) chartAportes.destroy();
+      chartAportes = new Chart(ctxA, {
+        type: 'bar',
+        data: {
+          labels: data.por_mes.map(d => d.mes),
+          datasets: [
+            { label: 'Ingresos', data: data.por_mes.map(d => d.ingresos), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
+            { label: 'Salidas',  data: data.por_mes.map(d => d.gastos),   backgroundColor: 'rgba(248,113,113,0.7)', borderRadius: 4 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: gridColor }, ticks: { color: tickColor } },
+            y: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+      window._charts.push(chartAportes);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const d = getDefaultDates();
+  document.getElementById('desde').value = d.desde;
+  document.getElementById('hasta').value = d.hasta;
+  document.querySelector('[data-qf="mes"]').classList.add('active');
+  loadData(d.desde, d.hasta);
+});
+</script>
+{% endblock %}

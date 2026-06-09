@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Diversión — App Finanzas{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1 class="page-title">Gastos de diversión</h1>
+  <p class="page-sub">El placer cuesta — ¿estás dentro de tu presupuesto de ocio?</p>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">Período</span>
+  <input type="date" id="desde" class="date-input">
+  <span class="filter-sep">→</span>
+  <input type="date" id="hasta" class="date-input">
+  <button class="filter-btn" onclick="applyFilter()">Aplicar</button>
+  <div class="quick-filters">
+    <button class="qf" data-qf="mes"  onclick="setQuickFilter('mes')">Mes</button>
+    <button class="qf" data-qf="3m"   onclick="setQuickFilter('3m')">3M</button>
+    <button class="qf" data-qf="año"  onclick="setQuickFilter('año')">Año</button>
+    <button class="qf" data-qf="todo" onclick="setQuickFilter('todo')">Todo</button>
+  </div>
+</div>
+
+<div class="kpi-grid kpi-grid-4">
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(249,115,22,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z"/>
+      </svg>
+    </div>
+    <div class="kpi-label">Total período</div>
+    <div class="kpi-value" style="color:#fb923c" id="kpi-total">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(249,115,22,0.1)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fdba74" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z"/>
+      </svg>
+    </div>
+    <div class="kpi-label">% del total gastos</div>
+    <div class="kpi-value" style="color:#fdba74" id="kpi-pct">— %</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(249,115,22,0.08)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fed7aa" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+      </svg>
+    </div>
+    <div class="kpi-label">Promedio mensual</div>
+    <div class="kpi-value" style="color:#fed7aa" id="kpi-prom">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(249,115,22,0.06)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffedd5" stroke-width="2.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25"/>
+      </svg>
+    </div>
+    <div class="kpi-label">Gasto máximo</div>
+    <div class="kpi-value" style="color:#ffedd5" id="kpi-max">S/ —</div>
+  </div>
+</div>
+
+<div class="charts-grid charts-grid-1">
+  <div class="card card-p">
+    <div class="chart-title">
+      Gastos de diversión por mes
+      <span class="chart-badge badge-orange">Barras</span>
+    </div>
+    <div style="position:relative;height:220px">
+      <canvas id="chartMens"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chartMens = null;
+
+function loadData(desde, hasta) {
+  fetch(`/api/diversion?desde=${desde}&hasta=${hasta}`)
+    .then(r => r.json())
+    .then(data => {
+      const fmt  = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+      document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
+      document.getElementById('kpi-pct').textContent   = data.kpis.pct_del_total + ' %';
+      document.getElementById('kpi-prom').textContent  = fmt(data.kpis.promedio_mensual);
+      document.getElementById('kpi-max').textContent   = fmt(data.kpis.gasto_max);
+
+      const dark = document.documentElement.classList.contains('dark');
+      const gridColor = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      const tickColor = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+      const ctxM = document.getElementById('chartMens').getContext('2d');
+      if (chartMens) chartMens.destroy();
+      const gradM = ctxM.createLinearGradient(0,0,0,220);
+      gradM.addColorStop(0, 'rgba(249,115,22,0.8)');
+      gradM.addColorStop(1, 'rgba(249,115,22,0.3)');
+      chartMens = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: data.por_mes.map(d => d.mes),
+          datasets: [{
+            label: 'Diversión',
+            data: data.por_mes.map(d => d.total),
+            backgroundColor: gradM,
+            borderRadius: 6,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: gridColor }, ticks: { color: tickColor } },
+            y: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+      window._charts.push(chartMens);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const d = getDefaultDates();
+  document.getElementById('desde').value = d.desde;
+  document.getElementById('hasta').value = d.hasta;
+  document.querySelector('[data-qf="mes"]').classList.add('active');
+  loadData(d.desde, d.hasta);
+});
+</script>
+{% endblock %}
