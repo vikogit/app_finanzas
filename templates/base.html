@@ -255,26 +255,31 @@
       border-radius: 10px;
       overflow: hidden;
       pointer-events: none;
-      opacity: 0.55;
-      transition: opacity 0.25s;
+      opacity: 0.18;
+      transition: opacity 0.5s ease;
       z-index: 0;
     }
     .glow-wrap:hover .glow-layer,
-    .glow-wrap:focus-within .glow-layer { opacity: 0.9; }
-    .glow-outer { inset: -6px; filter: blur(10px) url(#gfx1); }
-    .glow-mid   { inset: -2px; filter: blur(4px)  url(#gfx2); }
-    .glow-inn   { inset: -1px; filter: blur(2px)  url(#gfx3); }
+    .glow-wrap:focus-within .glow-layer { opacity: 0.52; }
+    /* outer: wide soft halo */
+    .glow-outer { inset: -10px; filter: blur(16px) url(#gfx1); }
+    /* mid: tight accent ring */
+    .glow-mid   { inset: -3px;  filter: blur(5px)  url(#gfx2); }
     .glow-spin {
       position: absolute; inset: -150%;
-      background: linear-gradient(90deg, #f97316 30%, transparent 50%, #dc2626 70%);
-      animation: g-speen 6s cubic-bezier(0.56,0.15,0.28,0.86) infinite,
-                 g-woah 3s ease-in-out infinite;
+      /* warm amber → transparent → coral — desaturated for elegance */
+      background: linear-gradient(90deg,
+        rgba(251,146,60,0.65) 25%,
+        transparent 50%,
+        rgba(220,80,60,0.55) 75%);
+      animation: g-speen 14s cubic-bezier(0.56,0.15,0.28,0.86) infinite,
+                 g-woah  6s ease-in-out infinite;
     }
     .glow-mid .glow-spin {
-      background: linear-gradient(90deg, #fb923c 20%, transparent 45% 55%, #ef4444 80%);
-    }
-    .glow-inn .glow-spin {
-      background: linear-gradient(90deg, #fed7aa 30%, transparent 45% 55%, #fca5a5 70%);
+      background: linear-gradient(90deg,
+        rgba(253,186,116,0.5) 20%,
+        transparent 45% 55%,
+        rgba(252,128,100,0.45) 80%);
     }
     .glow-surf {
       position: relative; z-index: 1;
@@ -285,11 +290,16 @@
       font-size: 12px; font-weight: 700; font-family: inherit;
       border-radius: 10px; text-decoration: none; white-space: nowrap;
       letter-spacing: 0.3px; transition: background 0.2s;
+      /* subtle ambient glow always visible */
+      box-shadow: 0 0 10px rgba(249,115,22,0.12), 0 2px 8px rgba(0,0,0,0.4);
     }
-    html:not(.dark) .glow-surf { background: #1a1a22; }
-    .glow-surf:hover { background: #1c1c24; }
-    .glow-wrap.glow-active .glow-layer { opacity: 1; }
-    .glow-wrap.glow-active .glow-surf { background: #1e0f06; }
+    html:not(.dark) .glow-surf { background: #18181f; }
+    .glow-surf:hover {
+      background: #1c1c24;
+      box-shadow: 0 0 18px rgba(249,115,22,0.22), 0 2px 12px rgba(0,0,0,0.5);
+    }
+    .glow-wrap.glow-active .glow-layer { opacity: 0.65; }
+    .glow-wrap.glow-active .glow-surf  { background: #1e0f06; }
     @keyframes g-speen {
       0%   { transform: rotate(10deg);  }
       50%  { transform: rotate(190deg); }
@@ -297,7 +307,7 @@
     }
     @keyframes g-woah {
       0%, 100% { transform: scale(1);    }
-      50%       { transform: scale(0.72); }
+      50%       { transform: scale(0.82); }
     }
 
     /* ─── Category navigation cards ─── */
@@ -431,17 +441,14 @@
   </style>
 </head>
 <body>
-<!-- SVG filters for glow button -->
+<!-- SVG filters for glow button — multipliers reduced for subtlety -->
 <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
   <defs>
     <filter id="gfx1" width="300%" x="-100%" height="300%" y="-100%">
-      <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 9 0"/>
+      <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 4 0"/>
     </filter>
     <filter id="gfx2" width="300%" x="-100%" height="300%" y="-100%">
-      <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 3 0"/>
-    </filter>
-    <filter id="gfx3" width="300%" x="-100%" height="300%" y="-100%">
-      <feColorMatrix values="1 0 0 0.2 0  0 1 0 0.2 0  0 0 1 0.2 0  0 0 0 2 0"/>
+      <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 2 0"/>
     </filter>
   </defs>
 </svg>
@@ -491,7 +498,6 @@
       <div class="glow-wrap {% if active_tab=='nuevo' %}glow-active{% endif %}">
         <div class="glow-layer glow-outer"><div class="glow-spin"></div></div>
         <div class="glow-layer glow-mid"><div class="glow-spin"></div></div>
-        <div class="glow-layer glow-inn"><div class="glow-spin"></div></div>
         <a href="/nuevo" class="glow-surf" aria-label="Nuevo movimiento">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
