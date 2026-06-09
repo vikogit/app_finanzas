@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-hdr">
   <h1 class="page-title">Gastos de necesidades</h1>
-  <p class="page-sub">¿En qué se va tu dinero de lo esencial? Identifica los patrones.</p>
+  <p class="page-sub">¿En qué se va tu dinero esencial? Identifica los patrones mes a mes.</p>
 </div>
 
 <div class="filter-bar">
@@ -24,50 +24,44 @@
 <div class="kpi-grid">
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(99,102,241,0.15)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
     </div>
     <div class="kpi-label">Total del período</div>
     <div class="kpi-value" style="color:#818cf8" id="kpi-total">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(99,102,241,0.1)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2.5" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
     </div>
     <div class="kpi-label">Promedio mensual</div>
     <div class="kpi-value" style="color:#a5b4fc" id="kpi-prom">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(99,102,241,0.08)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c7d2fe" stroke-width="2.5" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/>
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c7d2fe" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></svg>
     </div>
     <div class="kpi-label">Transacciones</div>
     <div class="kpi-value" style="color:#c7d2fe" id="kpi-txn">—</div>
   </div>
 </div>
 
-<div class="charts-grid">
+<div class="charts-grid-main">
   <div class="card card-p">
     <div class="chart-title">
-      Top gastos recurrentes
-      <span class="chart-badge badge-indigo">Barras horiz.</span>
+      Tendencia de gastos en el tiempo
+      <span class="chart-badge badge-indigo">Área · eToro</span>
     </div>
-    <div style="position:relative;height:220px">
-      <canvas id="chartTop"></canvas>
+    <div class="chart-area-wrap">
+      <canvas id="chartArea"></canvas>
     </div>
   </div>
   <div class="card card-p">
     <div class="chart-title">
-      Tendencia mensual
-      <span class="chart-badge badge-indigo">Línea</span>
+      ¿En qué gastas más?
+      <span class="chart-badge badge-indigo">Pastel</span>
     </div>
-    <div style="position:relative;height:200px">
-      <canvas id="chartTrend"></canvas>
+    <div class="chart-donut-wrap" style="position:relative">
+      <canvas id="chartDonut"></canvas>
     </div>
   </div>
 </div>
@@ -75,7 +69,7 @@
 
 {% block scripts %}
 <script>
-let chartTop = null, chartTrend = null;
+let chartArea = null, chartDonut = null;
 
 function loadData(desde, hasta) {
   fetch(`/api/necesidades?desde=${desde}&hasta=${hasta}`)
@@ -86,64 +80,16 @@ function loadData(desde, hasta) {
       document.getElementById('kpi-prom').textContent  = fmt(data.kpis.promedio_mensual);
       document.getElementById('kpi-txn').textContent   = data.kpis.num_transacciones;
 
-      const dark = document.documentElement.classList.contains('dark');
-      const gridColor = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-      const tickColor = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+      if (chartArea)  { chartArea.destroy();  window._charts = window._charts.filter(c=>c!==chartArea);  }
+      if (chartDonut) { chartDonut.destroy(); window._charts = window._charts.filter(c=>c!==chartDonut); }
 
-      // Horizontal bar – top gastos
-      const ctxT = document.getElementById('chartTop').getContext('2d');
-      if (chartTop) chartTop.destroy();
-      chartTop = new Chart(ctxT, {
-        type: 'bar',
-        data: {
-          labels: data.top_gastos.map(d => d.descripcion),
-          datasets: [{
-            label: 'Gasto',
-            data: data.top_gastos.map(d => d.total),
-            backgroundColor: 'rgba(99,102,241,0.7)',
-            borderRadius: 4,
-          }]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } },
-            y: { grid: { display: false }, ticks: { color: tickColor } }
-          },
-          plugins: { legend: { display: false } }
-        }
-      });
-      window._charts.push(chartTop);
+      const center = `<div class="donut-center-val" style="color:#818cf8">${fmt(data.kpis.total_periodo)}</div>
+                      <div class="donut-center-lbl">Total</div>`;
 
-      // Line – tendencia
-      const ctxL = document.getElementById('chartTrend').getContext('2d');
-      if (chartTrend) chartTrend.destroy();
-      const gradL = ctxL.createLinearGradient(0,0,0,200);
-      gradL.addColorStop(0, 'rgba(99,102,241,0.35)');
-      gradL.addColorStop(1, 'rgba(99,102,241,0.02)');
-      chartTrend = new Chart(ctxL, {
-        type: 'line',
-        data: {
-          labels: data.tendencia_mensual.map(d => d.mes),
-          datasets: [{
-            label: 'Gastos',
-            data: data.tendencia_mensual.map(d => d.total),
-            borderColor: '#818cf8', borderWidth: 2,
-            backgroundColor: gradL, fill: true,
-            tension: 0.4, pointRadius: 3, pointBackgroundColor: '#818cf8',
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-            y: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } }
-          },
-          plugins: { legend: { display: false } }
-        }
-      });
-      window._charts.push(chartTrend);
+      chartArea  = renderEtoroChart('chartArea', data.tendencia_mensual.map(d=>d.mes), data.tendencia_mensual.map(d=>d.total), '#818cf8', 129, 140, 248);
+      chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
+
+      window._charts.push(chartArea, chartDonut);
     });
 }
 

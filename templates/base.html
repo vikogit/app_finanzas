@@ -242,6 +242,19 @@
     /* ─── 1-col chart grid ─── */
     .charts-grid-1 { grid-template-columns: 1fr; }
 
+    /* ─── eToro-style: 3fr area + 2fr donut ─── */
+    .charts-grid-main { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; margin-bottom: 20px; }
+    .chart-area-wrap  { position: relative; height: 260px; }
+    .chart-donut-wrap { position: relative; height: 260px; }
+
+    /* Center label inside donut */
+    .donut-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      text-align: center; pointer-events: none; line-height: 1.2;
+    }
+    .donut-center-val  { font-size: 18px; font-weight: 800; color: var(--text); }
+    .donut-center-lbl  { font-size: 9px;  font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
     /* ─── Table (movimientos) ─── */
     .tbl-card { background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px; overflow: hidden; backdrop-filter: blur(10px); }
     .tbl-wrap { overflow-x: auto; }
@@ -312,6 +325,9 @@
       .kpi-grid { grid-template-columns: 1fr 1fr; }
       .kpi-grid-4 { grid-template-columns: 1fr 1fr; }
       .charts-grid { grid-template-columns: 1fr; }
+      .charts-grid-main { grid-template-columns: 1fr; }
+      .chart-area-wrap  { height: 210px; }
+      .chart-donut-wrap { height: 240px; }
       .brand-name { display: none; }
       .quick-filters { display: none; }
       .form-card { padding: 20px 16px; }
@@ -319,6 +335,7 @@
     @media (max-width: 480px) {
       .kpi-grid { grid-template-columns: 1fr; }
       .kpi-grid-4 { grid-template-columns: 1fr 1fr; }
+      .chart-area-wrap  { height: 190px; }
     }
   </style>
 </head>
@@ -477,6 +494,132 @@
   function catColor(name) {
     const dark = document.documentElement.classList.contains('dark');
     return (dark ? CAT_COLORS_DARK : CAT_COLORS)[name] || '#888';
+  }
+
+  /* ─── Donut palette ─── */
+  const DONUT_PALETTE = [
+    'rgba(249,115,22,0.85)',  'rgba(59,130,246,0.85)',
+    'rgba(34,197,94,0.85)',   'rgba(168,85,247,0.85)',
+    'rgba(236,72,153,0.85)',  'rgba(20,184,166,0.85)',
+    'rgba(245,158,11,0.85)',  'rgba(239,68,68,0.85)',
+    'rgba(99,102,241,0.85)',  'rgba(16,185,129,0.85)',
+  ];
+
+  /* ─── eToro-style area chart ─── */
+  function renderEtoroChart(canvasId, labels, values, hexColor, r, g, b, yLabel) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const dark = document.documentElement.classList.contains('dark');
+    const gridC = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+    const tickC = dark ? 'rgba(255,255,255,0.35)' : '#94a3b8';
+
+    const h = ctx.canvas.parentElement.offsetHeight || 260;
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0,   `rgba(${r},${g},${b},0.38)`);
+    grad.addColorStop(0.55,`rgba(${r},${g},${b},0.1)`);
+    grad.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+
+    return new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          borderColor: hexColor,
+          borderWidth: 2.5,
+          backgroundColor: grad,
+          fill: true,
+          tension: 0.45,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: hexColor,
+          pointHoverBorderColor: dark ? '#060610' : '#fff',
+          pointHoverBorderWidth: 2.5,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
+            titleColor: 'rgba(255,255,255,0.45)',
+            bodyColor: '#f1f5f9',
+            borderColor: `rgba(${r},${g},${b},0.35)`,
+            borderWidth: 1, padding: 12, cornerRadius: 10, displayColors: false,
+            callbacks: {
+              label: c => (yLabel || 'S/ ') + c.raw.toLocaleString('es-PE', {minimumFractionDigits:2})
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { color: tickC, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 }
+          },
+          y: {
+            grid: { color: gridC, drawBorder: false },
+            border: { display: false },
+            ticks: { color: tickC, font: { size: 10 }, callback: v => 'S/'+v.toLocaleString('es-PE') }
+          }
+        }
+      }
+    });
+  }
+
+  /* ─── Donut chart ─── */
+  function renderDonutChart(canvasId, items, centerHtml) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const dark = document.documentElement.classList.contains('dark');
+    const colors = DONUT_PALETTE.slice(0, items.length);
+
+    const chart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: items.map(i => i.label),
+        datasets: [{
+          data: items.map(i => i.value),
+          backgroundColor: colors,
+          borderColor: dark ? '#060610' : '#ffffff',
+          borderWidth: 3,
+          hoverOffset: 10,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: dark ? 'rgba(255,255,255,0.48)' : '#64748b',
+              font: { size: 10 }, boxWidth: 8, padding: 12,
+              usePointStyle: true, pointStyleWidth: 8,
+            }
+          },
+          tooltip: {
+            backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
+            titleColor: 'rgba(255,255,255,0.45)',
+            bodyColor: '#f1f5f9',
+            borderColor: 'rgba(255,255,255,0.12)',
+            borderWidth: 1, padding: 12, cornerRadius: 10,
+            callbacks: {
+              label: c => ' S/ ' + c.raw.toLocaleString('es-PE', {minimumFractionDigits:2})
+            }
+          }
+        }
+      }
+    });
+
+    /* inject center text */
+    if (centerHtml) {
+      const wrap = ctx.canvas.parentElement;
+      let el = wrap.querySelector('.donut-center');
+      if (!el) { el = document.createElement('div'); el.className='donut-center'; wrap.appendChild(el); }
+      el.innerHTML = centerHtml;
+    }
+    return chart;
   }
 </script>
 {% block scripts %}{% endblock %}

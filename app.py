@@ -70,6 +70,14 @@ def agrupar_mensual(movs):
     return [{"mes": k, **v} for k, v in sorted(bucket.items(), key=lambda x: _sk(x[0]))]
 
 
+def top_items(movs, n=8):
+    bucket = defaultdict(float)
+    for m in movs:
+        bucket[m.descripcion] += float(m.importe)
+    return [{"label": k, "value": round(v, 2)}
+            for k, v in sorted(bucket.items(), key=lambda x: -x[1])[:n]]
+
+
 # ── page routes ───────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET", "POST"])
@@ -223,6 +231,7 @@ def api_colchon():
     return jsonify({
         "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "num_movimientos": len(movs)},
         "por_mes": por_mes, "evolucion": evol,
+        "top_items": top_items(movs),
     })
 
 
@@ -232,11 +241,6 @@ def api_necesidades():
     desde, hasta = parse_dates(request)
     movs = query_movs(desde, hasta, categoria="Necesidades", tipo="Gasto")
     total = sum(float(m.importe) for m in movs)
-    por_desc = defaultdict(float)
-    for m in movs:
-        por_desc[m.descripcion] += float(m.importe)
-    top = [{"descripcion": d, "total": round(t, 2)}
-           for d, t in sorted(por_desc.items(), key=lambda x: -x[1])[:8]]
     por_mes = agrupar_mensual(movs)
     meses = len(por_mes)
     return jsonify({
@@ -245,7 +249,7 @@ def api_necesidades():
             "promedio_mensual": round(total / meses, 2) if meses else 0,
             "num_transacciones": len(movs),
         },
-        "top_gastos": top,
+        "top_items": top_items(movs),
         "tendencia_mensual": [{"mes": i["mes"], "total": round(i["gastos"], 2)} for i in por_mes],
     })
 
@@ -270,6 +274,7 @@ def api_diversion():
             "gasto_max": round(max(importes), 2) if importes else 0,
         },
         "por_mes": [{"mes": i["mes"], "total": round(i["gastos"], 2)} for i in por_mes],
+        "top_items": top_items(movs_div),
     })
 
 
@@ -289,6 +294,7 @@ def api_inversion():
         "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "meses_activos": len(por_mes)},
         "evolucion": evol,
         "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
+        "top_items": top_items(movs),
     })
 
 

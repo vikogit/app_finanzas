@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-hdr">
   <h1 class="page-title">Portafolio de inversión</h1>
-  <p class="page-sub">¿Tu dinero está trabajando para ti? Visualiza el crecimiento real.</p>
+  <p class="page-sub">Tu dinero trabajando para ti — visualiza el crecimiento real.</p>
 </div>
 
 <div class="filter-bar">
@@ -24,50 +24,44 @@
 <div class="kpi-grid">
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(234,179,8,0.15)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.5" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/>
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
     </div>
     <div class="kpi-label">Neto invertido</div>
     <div class="kpi-value" style="color:#facc15" id="kpi-neto">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(234,179,8,0.1)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fde047" stroke-width="2.5" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25"/>
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fde047" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75"/></svg>
     </div>
     <div class="kpi-label">Total movilizado</div>
     <div class="kpi-value" style="color:#fde047" id="kpi-total">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(234,179,8,0.08)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fef08a" stroke-width="2.5" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fef08a" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
     </div>
     <div class="kpi-label">Meses activos</div>
     <div class="kpi-value" style="color:#fef08a" id="kpi-meses">—</div>
   </div>
 </div>
 
-<div class="charts-grid">
+<div class="charts-grid-main">
   <div class="card card-p">
     <div class="chart-title">
-      Crecimiento acumulado de inversión
-      <span class="chart-badge badge-yellow">Área</span>
+      Crecimiento acumulado del portafolio
+      <span class="chart-badge badge-yellow">Área · eToro</span>
     </div>
-    <div style="position:relative;height:200px">
-      <canvas id="chartEvol"></canvas>
+    <div class="chart-area-wrap">
+      <canvas id="chartArea"></canvas>
     </div>
   </div>
   <div class="card card-p">
     <div class="chart-title">
-      Aportes por mes
-      <span class="chart-badge badge-yellow">Barras</span>
+      ¿Dónde inviertes?
+      <span class="chart-badge badge-yellow">Pastel</span>
     </div>
-    <div style="position:relative;height:200px">
-      <canvas id="chartAportes"></canvas>
+    <div class="chart-donut-wrap" style="position:relative">
+      <canvas id="chartDonut"></canvas>
     </div>
   </div>
 </div>
@@ -75,7 +69,7 @@
 
 {% block scripts %}
 <script>
-let chartEvol = null, chartAportes = null;
+let chartArea = null, chartDonut = null;
 
 function loadData(desde, hasta) {
   fetch(`/api/inversion?desde=${desde}&hasta=${hasta}`)
@@ -86,63 +80,16 @@ function loadData(desde, hasta) {
       document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
       document.getElementById('kpi-meses').textContent = data.kpis.meses_activos;
 
-      const dark = document.documentElement.classList.contains('dark');
-      const gridColor = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-      const tickColor = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+      if (chartArea)  { chartArea.destroy();  window._charts = window._charts.filter(c=>c!==chartArea);  }
+      if (chartDonut) { chartDonut.destroy(); window._charts = window._charts.filter(c=>c!==chartDonut); }
 
-      // Area acumulada
-      const ctxE = document.getElementById('chartEvol').getContext('2d');
-      if (chartEvol) chartEvol.destroy();
-      const gradE = ctxE.createLinearGradient(0,0,0,200);
-      gradE.addColorStop(0, 'rgba(234,179,8,0.4)');
-      gradE.addColorStop(1, 'rgba(234,179,8,0.02)');
-      chartEvol = new Chart(ctxE, {
-        type: 'line',
-        data: {
-          labels: data.evolucion.map(d => d.mes),
-          datasets: [{
-            label: 'Acumulado',
-            data: data.evolucion.map(d => d.acumulado),
-            borderColor: '#facc15', borderWidth: 2,
-            backgroundColor: gradE, fill: true,
-            tension: 0.4, pointRadius: 3, pointBackgroundColor: '#facc15',
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-            y: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } }
-          },
-          plugins: { legend: { display: false } }
-        }
-      });
-      window._charts.push(chartEvol);
+      const center = `<div class="donut-center-val" style="color:#facc15">${fmt(data.kpis.neto)}</div>
+                      <div class="donut-center-lbl">Neto</div>`;
 
-      // Barras aportes
-      const ctxA = document.getElementById('chartAportes').getContext('2d');
-      if (chartAportes) chartAportes.destroy();
-      chartAportes = new Chart(ctxA, {
-        type: 'bar',
-        data: {
-          labels: data.aportes_mensuales.map(d => d.mes),
-          datasets: [{
-            label: 'Aporte',
-            data: data.aportes_mensuales.map(d => d.monto),
-            backgroundColor: 'rgba(234,179,8,0.7)',
-            borderRadius: 4,
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-            y: { grid: { color: gridColor }, ticks: { color: tickColor, callback: v => 'S/'+v.toLocaleString('es-PE') } }
-          },
-          plugins: { legend: { display: false } }
-        }
-      });
-      window._charts.push(chartAportes);
+      chartArea  = renderEtoroChart('chartArea', data.evolucion.map(d=>d.mes), data.evolucion.map(d=>d.acumulado), '#facc15', 250, 204, 21);
+      chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
+
+      window._charts.push(chartArea, chartDonut);
     });
 }
 
