@@ -242,6 +242,64 @@
     /* ─── 1-col chart grid ─── */
     .charts-grid-1 { grid-template-columns: 1fr; }
 
+    /* ─── Glow Button (+ Nuevo) ─── */
+    .glow-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .glow-layer {
+      position: absolute;
+      border-radius: 10px;
+      overflow: hidden;
+      pointer-events: none;
+      opacity: 0.55;
+      transition: opacity 0.25s;
+      z-index: 0;
+    }
+    .glow-wrap:hover .glow-layer,
+    .glow-wrap:focus-within .glow-layer { opacity: 0.9; }
+    .glow-outer { inset: -6px; filter: blur(10px) url(#gfx1); }
+    .glow-mid   { inset: -2px; filter: blur(4px)  url(#gfx2); }
+    .glow-inn   { inset: -1px; filter: blur(2px)  url(#gfx3); }
+    .glow-spin {
+      position: absolute; inset: -150%;
+      background: linear-gradient(90deg, #f97316 30%, transparent 50%, #dc2626 70%);
+      animation: g-speen 6s cubic-bezier(0.56,0.15,0.28,0.86) infinite,
+                 g-woah 3s ease-in-out infinite;
+    }
+    .glow-mid .glow-spin {
+      background: linear-gradient(90deg, #fb923c 20%, transparent 45% 55%, #ef4444 80%);
+    }
+    .glow-inn .glow-spin {
+      background: linear-gradient(90deg, #fed7aa 30%, transparent 45% 55%, #fca5a5 70%);
+    }
+    .glow-surf {
+      position: relative; z-index: 1;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 6px 14px;
+      background: #0f0f12;
+      color: #fff;
+      font-size: 12px; font-weight: 700; font-family: inherit;
+      border-radius: 10px; text-decoration: none; white-space: nowrap;
+      letter-spacing: 0.3px; transition: background 0.2s;
+    }
+    html:not(.dark) .glow-surf { background: #1a1a22; }
+    .glow-surf:hover { background: #1c1c24; }
+    .glow-wrap.glow-active .glow-layer { opacity: 1; }
+    .glow-wrap.glow-active .glow-surf { background: #1e0f06; }
+    @keyframes g-speen {
+      0%   { transform: rotate(10deg);  }
+      50%  { transform: rotate(190deg); }
+      100% { transform: rotate(370deg); }
+    }
+    @keyframes g-woah {
+      0%, 100% { transform: scale(1);    }
+      50%       { transform: scale(0.72); }
+    }
+
     /* ─── Category navigation cards ─── */
     .cat-nav-grid {
       display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px;
@@ -373,6 +431,21 @@
   </style>
 </head>
 <body>
+<!-- SVG filters for glow button -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <filter id="gfx1" width="300%" x="-100%" height="300%" y="-100%">
+      <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 9 0"/>
+    </filter>
+    <filter id="gfx2" width="300%" x="-100%" height="300%" y="-100%">
+      <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 3 0"/>
+    </filter>
+    <filter id="gfx3" width="300%" x="-100%" height="300%" y="-100%">
+      <feColorMatrix values="1 0 0 0.2 0  0 1 0 0.2 0  0 0 1 0.2 0  0 0 0 2 0"/>
+    </filter>
+  </defs>
+</svg>
+
 <div class="blobs" aria-hidden="true">
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
@@ -415,7 +488,17 @@
 
       <!-- Nav links (movimientos + nuevo) -->
       <a href="/movimientos" class="tab {% if active_tab=='movimientos' %}active{% endif %}">Movimientos</a>
-      <a href="/nuevo" class="tab {% if active_tab=='nuevo' %}active{% endif %}">+ Nuevo</a>
+      <div class="glow-wrap {% if active_tab=='nuevo' %}glow-active{% endif %}">
+        <div class="glow-layer glow-outer"><div class="glow-spin"></div></div>
+        <div class="glow-layer glow-mid"><div class="glow-spin"></div></div>
+        <div class="glow-layer glow-inn"><div class="glow-spin"></div></div>
+        <a href="/nuevo" class="glow-surf" aria-label="Nuevo movimiento">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+          </svg>
+          Nuevo
+        </a>
+      </div>
 
       <a href="/logout" class="logout-btn" aria-label="Cerrar sesión">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
