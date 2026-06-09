@@ -1,139 +1,167 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Nuevo Movimiento</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuevo movimiento — App Finanzas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: { fontFamily: { inter: ['Inter', 'sans-serif'] } }
+            }
+        }
+    </script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            padding: 40px;
-        }
-
-        .contenedor {
-            max-width: 700px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-
-        h1 {
-            margin-bottom: 25px;
-        }
-
-        .grupo {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-
-        input[type="date"],
-        input[type="text"],
-        input[type="number"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            font-size: 14px;
-        }
-
-        .segmentado {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .segmentado input[type="radio"] {
-            display: none;
-        }
-
-        .segmentado label {
-            padding: 10px 16px;
-            border: 1px solid #ccc;
-            border-radius: 999px;
-            cursor: pointer;
-            background-color: #f8f8f8;
-            font-weight: normal;
-        }
-
-        .segmentado input[type="radio"]:checked + label {
-            background-color: #1f3b5b;
+        /* Custom pill radio buttons */
+        .pill-radio input[type="radio"] { display: none; }
+        .pill-radio input[type="radio"]:checked + label {
+            background-color: #0F172A;
             color: white;
-            border-color: #1f3b5b;
+            border-color: #0F172A;
         }
-
-        button {
-            background-color: #1f3b5b;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 15px;
-        }
-
-        button:hover {
-            opacity: 0.95;
+        .pill-radio input[type="radio"]#ingreso:checked + label {
+            background-color: #16A34A;
+            border-color: #16A34A;
         }
     </style>
 </head>
-<body>
+<body class="font-inter bg-slate-50 min-h-screen">
 
-    <div class="contenedor">
-        <h1>Nuevo Movimiento</h1>
-
-        <form method="POST">
-            <div class="grupo">
-                <label for="fecha">Fecha</label>
-                <input type="date" id="fecha" name="fecha">
-            </div>
-
-            <div class="grupo">
-                <label>Tipo</label>
-                <div class="segmentado">
-                    <input type="radio" id="gasto" name="tipo" value="Gasto" checked>
-                    <label for="gasto">Gasto</label>
-
-                    <input type="radio" id="ingreso" name="tipo" value="Ingreso">
-                    <label for="ingreso">Ingreso</label>
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="flex items-center justify-center w-8 h-8 bg-slate-900 rounded-lg">
+                    <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                    </svg>
                 </div>
+                <span class="font-semibold text-slate-900 text-sm">App Finanzas</span>
             </div>
 
-            <div class="grupo">
-                <label>Categoría</label>
-                <div class="segmentado">
-                    <input type="radio" id="colchon" name="categoria" value="Colchón" checked>
-                    <label for="colchon">Colchón</label>
+            <div class="hidden sm:flex items-center gap-1">
+                <a href="/dashboard" class="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors">Dashboard</a>
+                <a href="/movimientos" class="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors">Movimientos</a>
+                <a href="/nuevo" class="px-3 py-1.5 text-sm font-medium text-slate-900 bg-slate-100 rounded-lg">Nuevo</a>
+            </div>
 
-                    <input type="radio" id="necesidades" name="categoria" value="Necesidades">
-                    <label for="necesidades">Necesidades</label>
+            <a href="/logout" class="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-red-600 transition-colors cursor-pointer">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+                <span class="hidden sm:inline">Salir</span>
+            </a>
+        </div>
+    </nav>
 
-                    <input type="radio" id="diversion" name="categoria" value="Diversión">
-                    <label for="diversion">Diversión</label>
+    <!-- Main content -->
+    <main class="max-w-2xl mx-auto px-6 py-8">
 
-                    <input type="radio" id="inversion" name="categoria" value="Inversión">
-                    <label for="inversion">Inversión</label>
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-slate-900">Nuevo movimiento</h1>
+            <p class="text-slate-500 text-sm mt-1">Registra un ingreso o gasto</p>
+        </div>
+
+        <!-- Form card -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-7">
+            <form method="POST" class="space-y-5">
+
+                <!-- Fecha -->
+                <div>
+                    <label for="fecha" class="block text-sm font-medium text-slate-700 mb-1.5">Fecha</label>
+                    <input
+                        type="date" id="fecha" name="fecha"
+                        class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
                 </div>
-            </div>
 
-            <div class="grupo">
-                <label for="descripcion">Descripción</label>
-                <input type="text" id="descripcion" name="descripcion" placeholder="Ejemplo: fruta, pasajes, interés, ahorro...">
-            </div>
+                <!-- Tipo -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Tipo</label>
+                    <div class="flex gap-2 pill-radio">
+                        <input type="radio" id="gasto" name="tipo" value="Gasto" checked>
+                        <label for="gasto" class="px-4 py-2 border border-slate-200 rounded-full text-sm font-medium text-slate-600 bg-slate-50 cursor-pointer transition-all duration-150 hover:border-slate-300">
+                            Gasto
+                        </label>
 
-            <div class="grupo">
-                <label for="importe">Importe</label>
-                <input type="number" id="importe" name="importe" step="0.01" placeholder="Ejemplo: 60 o 18.75">
-            </div>
+                        <input type="radio" id="ingreso" name="tipo" value="Ingreso">
+                        <label for="ingreso" class="px-4 py-2 border border-slate-200 rounded-full text-sm font-medium text-slate-600 bg-slate-50 cursor-pointer transition-all duration-150 hover:border-slate-300">
+                            Ingreso
+                        </label>
+                    </div>
+                </div>
 
-            <button type="submit">Guardar movimiento</button>
-        </form>
-    </div>
+                <!-- Categoría -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Categoría</label>
+                    <div class="flex flex-wrap gap-2 pill-radio">
+                        <input type="radio" id="colchon" name="categoria" value="Colchón" checked>
+                        <label for="colchon" class="px-4 py-2 border border-slate-200 rounded-full text-sm font-medium text-slate-600 bg-slate-50 cursor-pointer transition-all duration-150 hover:border-slate-300">
+                            Colchón
+                        </label>
+
+                        <input type="radio" id="necesidades" name="categoria" value="Necesidades">
+                        <label for="necesidades" class="px-4 py-2 border border-slate-200 rounded-full text-sm font-medium text-slate-600 bg-slate-50 cursor-pointer transition-all duration-150 hover:border-slate-300">
+                            Necesidades
+                        </label>
+
+                        <input type="radio" id="diversion" name="categoria" value="Diversión">
+                        <label for="diversion" class="px-4 py-2 border border-slate-200 rounded-full text-sm font-medium text-slate-600 bg-slate-50 cursor-pointer transition-all duration-150 hover:border-slate-300">
+                            Diversión
+                        </label>
+
+                        <input type="radio" id="inversion" name="categoria" value="Inversión">
+                        <label for="inversion" class="px-4 py-2 border border-slate-200 rounded-full text-sm font-medium text-slate-600 bg-slate-50 cursor-pointer transition-all duration-150 hover:border-slate-300">
+                            Inversión
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Descripción -->
+                <div>
+                    <label for="descripcion" class="block text-sm font-medium text-slate-700 mb-1.5">Descripción</label>
+                    <input
+                        type="text" id="descripcion" name="descripcion"
+                        placeholder="Ej: fruta, pasajes, interés, ahorro..."
+                        class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    >
+                </div>
+
+                <!-- Importe -->
+                <div>
+                    <label for="importe" class="block text-sm font-medium text-slate-700 mb-1.5">Importe (S/)</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400">S/</span>
+                        <input
+                            type="number" id="importe" name="importe" step="0.01" min="0"
+                            placeholder="0.00"
+                            class="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        >
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="flex gap-3 pt-2">
+                    <button
+                        type="submit"
+                        class="flex-1 sm:flex-none sm:w-auto bg-slate-900 hover:bg-slate-700 active:bg-slate-800 text-white font-semibold py-2.5 px-6 rounded-xl text-sm transition-colors duration-200 cursor-pointer"
+                    >
+                        Guardar movimiento
+                    </button>
+                    <a href="/dashboard" class="flex-1 sm:flex-none sm:w-auto text-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-6 rounded-xl text-sm transition-colors duration-200 cursor-pointer">
+                        Cancelar
+                    </a>
+                </div>
+
+            </form>
+        </div>
+
+    </main>
 
     <script>
         const fechaInput = document.getElementById("fecha");
