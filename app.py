@@ -288,7 +288,7 @@ def api_inversion():
     por_mes = agrupar_mensual(movs)
     acum, evol = 0.0, []
     for item in por_mes:
-        acum += item["ingresos"] - item["gastos"]
+        acum += item["gastos"]
         evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
     return jsonify({
         "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "meses_activos": len(por_mes)},
