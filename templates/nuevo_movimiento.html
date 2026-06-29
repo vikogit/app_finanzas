@@ -57,7 +57,17 @@
         placeholder="Ej: fruta, pasajes, interés, ahorro..." class="form-input">
     </div>
 
-    <div class="form-field">
+    <!-- Bloque USD: solo visible en Inversión + Gasto -->
+    <div class="form-field" id="usd-block" style="display:none">
+      <label for="monto-usd" class="form-label">Importe (USD $)</label>
+      <div class="form-input-prefix">
+        <span class="form-prefix">$</span>
+        <input type="number" id="monto-usd" step="0.01" min="0" placeholder="0.00" class="form-input" oninput="updateConversion()">
+      </div>
+      <div id="usd-info" style="margin-top:8px;font-size:13px;color:#facc15;min-height:18px"></div>
+    </div>
+
+    <div class="form-field" id="importe-field">
       <label for="importe" class="form-label">Importe (S/)</label>
       <div class="form-input-prefix">
         <span class="form-prefix">S/</span>
@@ -78,5 +88,58 @@
 {% block scripts %}
 <script>
   document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+
+  let tcRate = null;
+
+  async function fetchRate() {
+    try {
+      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=PEN');
+      const data = await res.json();
+      tcRate = data.rates.PEN;
+    } catch(e) { tcRate = null; }
+  }
+
+  function isInversionGasto() {
+    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+    const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
+    return tipo === 'Gasto' && cat === 'Inversión';
+  }
+
+  function updateVisibility() {
+    const show = isInversionGasto();
+    document.getElementById('usd-block').style.display    = show ? '' : 'none';
+    document.getElementById('importe-field').style.display = show ? 'none' : '';
+    const importeInput = document.getElementById('importe');
+    if (show) {
+      importeInput.removeAttribute('required');
+      updateConversion();
+    } else {
+      importeInput.setAttribute('required', '');
+      document.getElementById('monto-usd').value = '';
+      document.getElementById('usd-info').textContent = '';
+    }
+  }
+
+  function updateConversion() {
+    const usd = parseFloat(document.getElementById('monto-usd').value) || 0;
+    const info = document.getElementById('usd-info');
+    const importeInput = document.getElementById('importe');
+    if (!usd) { info.textContent = tcRate ? `TC: 1 USD = S/ ${tcRate.toFixed(3)}` : ''; importeInput.value = ''; return; }
+    if (tcRate) {
+      const soles = (usd * tcRate).toFixed(2);
+      importeInput.value = soles;
+      info.textContent = `$ ${usd.toFixed(2)} × ${tcRate.toFixed(3)} = S/ ${soles}`;
+    } else {
+      info.textContent = 'Sin conexión al tipo de cambio — ingresa S/ manualmente';
+      document.getElementById('importe-field').style.display = '';
+      importeInput.setAttribute('required', '');
+    }
+  }
+
+  document.querySelectorAll('input[name="tipo"], input[name="categoria"]').forEach(el =>
+    el.addEventListener('change', updateVisibility)
+  );
+
+  fetchRate().then(updateVisibility);
 </script>
 {% endblock %}
