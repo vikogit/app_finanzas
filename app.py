@@ -5,6 +5,8 @@ from datetime import datetime, date as date_type
 from functools import wraps
 from collections import defaultdict
 import os
+import requests as http_requests
+import time
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -296,6 +298,30 @@ def api_inversion():
         "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
         "top_items": top_items(movs),
     })
+
+
+_tc_cache = {"rate": None, "ts": 0}
+
+@app.route("/api/tipo-cambio")
+@login_requerido
+def api_tipo_cambio():
+    now = time.time()
+    if _tc_cache["rate"] and now - _tc_cache["ts"] < 3600:
+        return jsonify({"rate": _tc_cache["rate"]})
+    apis = [
+        ("https://api.frankfurter.app/latest?from=USD&to=PEN", lambda d: d["rates"]["PEN"]),
+        ("https://open.er-api.com/v6/latest/USD",              lambda d: d["rates"]["PEN"]),
+    ]
+    for url, extractor in apis:
+        try:
+            resp = http_requests.get(url, timeout=5)
+            rate = extractor(resp.json())
+            _tc_cache["rate"] = rate
+            _tc_cache["ts"]   = now
+            return jsonify({"rate": rate})
+        except Exception:
+            continue
+    return jsonify({"error": "no disponible"}), 503
 
 
 if __name__ == "__main__":

@@ -93,9 +93,9 @@
 
   async function fetchRate() {
     try {
-      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=PEN');
+      const res = await fetch('/api/tipo-cambio');
       const data = await res.json();
-      tcRate = data.rates.PEN;
+      tcRate = data.rate || null;
     } catch(e) { tcRate = null; }
   }
 
