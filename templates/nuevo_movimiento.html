@@ -105,7 +105,7 @@
       <input type="hidden" name="investment_asset_name" id="investment_asset_name">
     </div>
 
-    <div class="form-field">
+    <div class="form-field" id="descripcion-field">
       <label for="descripcion" class="form-label">Descripción</label>
       <input type="text" id="descripcion" name="descripcion" required
         placeholder="Ej: fruta, pasajes, interés, ahorro..." class="form-input">
@@ -171,15 +171,19 @@
 
   function updateVisibility() {
     const show = isInversionGasto();
-    document.getElementById('asset-block').style.display   = show ? '' : 'none';
-    document.getElementById('usd-block').style.display     = show ? '' : 'none';
-    document.getElementById('importe-field').style.display = show ? 'none' : '';
-    const imp = document.getElementById('importe');
+    document.getElementById('asset-block').style.display      = show ? '' : 'none';
+    document.getElementById('usd-block').style.display        = show ? '' : 'none';
+    document.getElementById('importe-field').style.display    = show ? 'none' : '';
+    document.getElementById('descripcion-field').style.display = show ? 'none' : '';
+    const desc = document.getElementById('descripcion');
+    const imp  = document.getElementById('importe');
     if (show) {
       imp.removeAttribute('required');
+      desc.removeAttribute('required');
       updateConversion();
     } else {
       imp.setAttribute('required', '');
+      desc.setAttribute('required', '');
       document.getElementById('monto-usd').value = '';
       document.getElementById('usd-info').textContent = '';
       resetAssetSelector();
@@ -295,7 +299,10 @@
     if (!imp || parseFloat(imp) <= 0) {
       e.preventDefault();
       alert('Por favor ingresa el importe en USD.');
+      return;
     }
+    // Usar el nombre del activo como descripción
+    document.getElementById('descripcion').value = assetName;
   });
 
   document.querySelectorAll('input[name="tipo"], input[name="categoria"]').forEach(el =>
