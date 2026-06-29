@@ -2,13 +2,38 @@
 {% block title %}Nuevo movimiento — App Finanzas{% endblock %}
 
 {% block content %}
+<style>
+  .asset-btn {
+    padding: 7px 16px; border: 1px solid var(--border); border-radius: 99px;
+    font-size: 12px; font-weight: 500; color: var(--text-muted);
+    background: var(--input-bg); cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .asset-btn:hover { color: var(--text); border-color: rgba(249,115,22,0.3); }
+  .asset-btn.active {
+    background: linear-gradient(135deg, rgba(249,115,22,0.3), rgba(220,38,38,0.3));
+    color: #fb923c; border-color: rgba(249,115,22,0.4);
+  }
+  .asset-back {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border: 1px solid var(--border); background: var(--input-bg);
+    color: var(--text-muted); font-size: 11px; font-weight: 600;
+    cursor: pointer; font-family: inherit; margin-bottom: 10px;
+    border-radius: 8px; transition: color .15s, background .15s;
+  }
+  .asset-back:hover { color: var(--text); }
+  .asset-step-hint {
+    display: block; font-size: 10px; font-weight: 600; color: var(--text-subtle);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+</style>
+
 <div class="page-hdr">
   <h1 class="page-title">Nuevo movimiento</h1>
   <p class="page-sub">Registra un ingreso o gasto</p>
 </div>
 
 <div class="form-card">
-  <form method="POST">
+  <form method="POST" id="form-nuevo">
 
     <div class="form-field">
       <label for="fecha" class="form-label">Fecha</label>
@@ -51,6 +76,35 @@
       </div>
     </div>
 
+    <!-- Selector de activo: solo visible en Inversión + Gasto -->
+    <div class="form-field" id="asset-block" style="display:none">
+      <span class="form-label">Activo</span>
+
+      <!-- Paso 1: tipo de activo -->
+      <div id="asset-step1">
+        <span class="asset-step-hint">Paso 1 — Elige el tipo</span>
+        <div class="pill-group">
+          <button type="button" class="asset-btn" onclick="selectAssetType('ETFs')">ETFs</button>
+          <button type="button" class="asset-btn" onclick="selectAssetType('Acciones')">Acciones</button>
+          <button type="button" class="asset-btn" onclick="selectAssetType('Cripto')">Cripto</button>
+          <button type="button" class="asset-btn" onclick="selectAssetType('Materias Primas')">Materias Primas</button>
+          <button type="button" class="asset-btn" onclick="selectAssetType('Bonos / Renta Fija')">Bonos / Renta Fija</button>
+        </div>
+      </div>
+
+      <!-- Paso 2: activo específico -->
+      <div id="asset-step2" style="display:none">
+        <button type="button" class="asset-back" onclick="backToStep1()">← Atrás</button>
+        <span class="asset-step-hint" id="asset-step2-hint">Paso 2 — Elige el activo</span>
+        <div class="pill-group" id="asset-sub-btns"></div>
+        <input type="text" id="asset-custom-input" class="form-input"
+               placeholder="Nombre del activo..." style="display:none; margin-top:10px;">
+      </div>
+
+      <input type="hidden" name="investment_asset_type" id="investment_asset_type">
+      <input type="hidden" name="investment_asset_name" id="investment_asset_name">
+    </div>
+
     <div class="form-field">
       <label for="descripcion" class="form-label">Descripción</label>
       <input type="text" id="descripcion" name="descripcion" required
@@ -62,7 +116,8 @@
       <label for="monto-usd" class="form-label">Importe (USD $)</label>
       <div class="form-input-prefix">
         <span class="form-prefix">$</span>
-        <input type="number" id="monto-usd" step="0.01" min="0" placeholder="0.00" class="form-input" oninput="updateConversion()">
+        <input type="number" id="monto-usd" step="0.01" min="0" placeholder="0.00"
+               class="form-input" oninput="updateConversion()">
       </div>
       <div id="usd-info" style="margin-top:8px;font-size:13px;color:#facc15;min-height:18px"></div>
     </div>
@@ -91,9 +146,18 @@
 
   let tcRate = null;
 
+  const ASSET_SUBS = {
+    'ETFs':               ['S&P 500', 'Nasdaq', 'Uranio (URA)', 'REMX', 'Otro'],
+    'Acciones':           null,
+    'Cripto':             ['Bitcoin', 'Ethereum', 'Solana', 'Cardano', 'Otro'],
+    'Materias Primas':    ['Oro', 'Otro'],
+    'Bonos / Renta Fija': null,
+  };
+
+  // ── Tipo de cambio ────────────────────────────────────────────────────
   async function fetchRate() {
     try {
-      const res = await fetch('/api/tipo-cambio');
+      const res  = await fetch('/api/tipo-cambio');
       const data = await res.json();
       tcRate = data.rate || null;
     } catch(e) { tcRate = null; }
@@ -107,34 +171,132 @@
 
   function updateVisibility() {
     const show = isInversionGasto();
-    document.getElementById('usd-block').style.display    = show ? '' : 'none';
+    document.getElementById('asset-block').style.display   = show ? '' : 'none';
+    document.getElementById('usd-block').style.display     = show ? '' : 'none';
     document.getElementById('importe-field').style.display = show ? 'none' : '';
-    const importeInput = document.getElementById('importe');
+    const imp = document.getElementById('importe');
     if (show) {
-      importeInput.removeAttribute('required');
+      imp.removeAttribute('required');
       updateConversion();
     } else {
-      importeInput.setAttribute('required', '');
+      imp.setAttribute('required', '');
       document.getElementById('monto-usd').value = '';
       document.getElementById('usd-info').textContent = '';
+      resetAssetSelector();
     }
   }
 
   function updateConversion() {
-    const usd = parseFloat(document.getElementById('monto-usd').value) || 0;
+    const usd  = parseFloat(document.getElementById('monto-usd').value) || 0;
     const info = document.getElementById('usd-info');
-    const importeInput = document.getElementById('importe');
-    if (!usd) { info.textContent = tcRate ? `TC: 1 USD = S/ ${tcRate.toFixed(3)}` : ''; importeInput.value = ''; return; }
+    const imp  = document.getElementById('importe');
+    if (!usd) {
+      info.textContent = tcRate ? `TC: 1 USD = S/ ${tcRate.toFixed(3)}` : '';
+      imp.value = '';
+      return;
+    }
     if (tcRate) {
       const soles = (usd * tcRate).toFixed(2);
-      importeInput.value = soles;
+      imp.value = soles;
       info.textContent = `$ ${usd.toFixed(2)} × ${tcRate.toFixed(3)} = S/ ${soles}`;
     } else {
       info.textContent = 'Sin conexión al tipo de cambio — ingresa S/ manualmente';
       document.getElementById('importe-field').style.display = '';
-      importeInput.setAttribute('required', '');
+      imp.setAttribute('required', '');
     }
   }
+
+  // ── Selector de activo ────────────────────────────────────────────────
+  function selectAssetType(type) {
+    document.querySelectorAll('#asset-step1 .asset-btn').forEach(b =>
+      b.classList.toggle('active', b.textContent.trim() === type)
+    );
+    document.getElementById('investment_asset_type').value = type;
+    document.getElementById('investment_asset_name').value = '';
+
+    document.getElementById('asset-step1').style.display = 'none';
+    document.getElementById('asset-step2').style.display = '';
+    document.getElementById('asset-step2-hint').textContent = `Paso 2 — Activo en ${type}`;
+
+    const subBtns     = document.getElementById('asset-sub-btns');
+    const customInput = document.getElementById('asset-custom-input');
+    const subs        = ASSET_SUBS[type];
+
+    if (subs === null) {
+      subBtns.innerHTML = '';
+      customInput.style.display = '';
+      customInput.placeholder   = 'Escribe el nombre del activo...';
+      customInput.value = '';
+      customInput.oninput = () => {
+        document.getElementById('investment_asset_name').value = customInput.value.trim();
+      };
+    } else {
+      subBtns.innerHTML = subs.map(s =>
+        `<button type="button" class="asset-btn" onclick="selectAssetName('${s}')">${s}</button>`
+      ).join('');
+      customInput.style.display = 'none';
+      customInput.value = '';
+    }
+  }
+
+  function selectAssetName(name) {
+    document.querySelectorAll('#asset-sub-btns .asset-btn').forEach(b =>
+      b.classList.toggle('active', b.textContent.trim() === name)
+    );
+    const customInput = document.getElementById('asset-custom-input');
+    if (name === 'Otro') {
+      customInput.style.display = '';
+      customInput.placeholder   = 'Especifica el activo...';
+      customInput.value = '';
+      customInput.oninput = () => {
+        document.getElementById('investment_asset_name').value = customInput.value.trim();
+      };
+      document.getElementById('investment_asset_name').value = '';
+    } else {
+      customInput.style.display = 'none';
+      document.getElementById('investment_asset_name').value = name;
+    }
+  }
+
+  function backToStep1() {
+    document.getElementById('asset-step1').style.display = '';
+    document.getElementById('asset-step2').style.display = 'none';
+    document.getElementById('investment_asset_type').value = '';
+    document.getElementById('investment_asset_name').value = '';
+    document.getElementById('asset-custom-input').value   = '';
+    document.querySelectorAll('#asset-step1 .asset-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  function resetAssetSelector() {
+    document.getElementById('asset-step1').style.display = '';
+    document.getElementById('asset-step2').style.display = 'none';
+    document.getElementById('investment_asset_type').value = '';
+    document.getElementById('investment_asset_name').value = '';
+    document.getElementById('asset-custom-input').value   = '';
+    document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  // ── Validación al enviar ──────────────────────────────────────────────
+  document.getElementById('form-nuevo').addEventListener('submit', function(e) {
+    if (!isInversionGasto()) return;
+    const assetType = document.getElementById('investment_asset_type').value;
+    const assetName = document.getElementById('investment_asset_name').value;
+    const imp       = document.getElementById('importe').value;
+    if (!assetType) {
+      e.preventDefault();
+      alert('Por favor selecciona el tipo de activo (Paso 1).');
+      return;
+    }
+    if (!assetName) {
+      e.preventDefault();
+      alert('Por favor especifica el activo (Paso 2).');
+      return;
+    }
+    if (!imp || parseFloat(imp) <= 0) {
+      e.preventDefault();
+      alert('Por favor ingresa el importe en USD.');
+    }
+  });
 
   document.querySelectorAll('input[name="tipo"], input[name="categoria"]').forEach(el =>
     el.addEventListener('change', updateVisibility)

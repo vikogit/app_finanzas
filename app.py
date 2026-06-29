@@ -28,12 +28,14 @@ def login_requerido(f):
 
 class Movimiento(db.Model):
     __tablename__ = "movimientos"
-    id          = db.Column(db.Integer, primary_key=True)
-    fecha       = db.Column(db.Date, nullable=False)
-    tipo        = db.Column(db.String(20), nullable=False)
-    categoria   = db.Column(db.String(30), nullable=False)
-    descripcion = db.Column(db.String(255), nullable=False)
-    importe     = db.Column(db.Numeric(10, 2), nullable=False)
+    id                   = db.Column(db.Integer, primary_key=True)
+    fecha                = db.Column(db.Date, nullable=False)
+    tipo                 = db.Column(db.String(20), nullable=False)
+    categoria            = db.Column(db.String(30), nullable=False)
+    descripcion          = db.Column(db.String(255), nullable=False)
+    importe              = db.Column(db.Numeric(10, 2), nullable=False)
+    investment_asset_type = db.Column(db.String(50),  nullable=True)
+    investment_asset_name = db.Column(db.String(100), nullable=True)
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -140,7 +142,9 @@ def nuevo():
                 tipo=request.form["tipo"],
                 categoria=request.form["categoria"],
                 descripcion=request.form["descripcion"],
-                importe=float(request.form["importe"])
+                importe=float(request.form["importe"]),
+                investment_asset_type=request.form.get("investment_asset_type") or None,
+                investment_asset_name=request.form.get("investment_asset_name") or None,
             )
             db.session.add(m)
             db.session.commit()
@@ -297,6 +301,57 @@ def api_inversion():
         "evolucion": evol,
         "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
         "top_items": top_items(movs),
+    })
+
+
+@app.route("/inversiones")
+@login_requerido
+def inversiones_portfolio():
+    return render_template("inversiones.html", active_tab="portafolio")
+
+
+@app.route("/api/inversiones")
+@login_requerido
+def api_inversiones():
+    desde, hasta = parse_dates(request)
+    cat_tipo = request.args.get("categoria", "ETFs")
+    movs = Movimiento.query.filter(
+        Movimiento.fecha >= desde,
+        Movimiento.fecha <= hasta,
+        Movimiento.categoria == "Inversión",
+        Movimiento.tipo == "Gasto",
+        Movimiento.investment_asset_type == cat_tipo
+    ).order_by(Movimiento.fecha).all()
+
+    total = sum(float(m.importe) for m in movs)
+
+    by_asset = defaultdict(float)
+    for m in movs:
+        key = m.investment_asset_name or "Sin especificar"
+        by_asset[key] += float(m.importe)
+
+    por_mes = agrupar_mensual(movs)
+    acum, evol = 0.0, []
+    for item in por_mes:
+        acum += item["gastos"]
+        evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
+
+    tabla = [{
+        "fecha": m.fecha.strftime("%Y-%m-%d"),
+        "activo": m.investment_asset_name or "—",
+        "monto": float(m.importe),
+        "notas": m.descripcion,
+    } for m in reversed(movs)]
+
+    by_asset_list = [{"label": k, "value": round(v, 2)}
+                     for k, v in sorted(by_asset.items(), key=lambda x: -x[1])]
+
+    return jsonify({
+        "total":    round(total, 2),
+        "num_ops":  len(movs),
+        "by_asset": by_asset_list if by_asset_list else [{"label": "Sin datos", "value": 1}],
+        "evolucion": evol,
+        "tabla":    tabla,
     })
 
 
