@@ -82,6 +82,25 @@ def top_items(movs, n=8):
             for k, v in sorted(bucket.items(), key=lambda x: -x[1])[:n]]
 
 
+def ranking_por_descripcion(movs):
+    bucket = defaultdict(lambda: {"total": 0.0, "num_pagos": 0})
+    for m in movs:
+        b = bucket[m.descripcion]
+        b["total"] += float(m.importe)
+        b["num_pagos"] += 1
+    total_general = sum(b["total"] for b in bucket.values())
+    ranking = [
+        {
+            "alumno": k,
+            "total": round(b["total"], 2),
+            "num_pagos": b["num_pagos"],
+            "pct": round(b["total"] / total_general * 100, 1) if total_general else 0,
+        }
+        for k, b in bucket.items()
+    ]
+    return sorted(ranking, key=lambda x: -x["total"])
+
+
 # ── page routes ───────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET", "POST"])
@@ -130,6 +149,12 @@ def dashboard_diversion():
 @login_requerido
 def dashboard_inversion():
     return render_template("inversion.html", active_tab="inversion")
+
+
+@app.route("/dashboard/vortex")
+@login_requerido
+def dashboard_vortex():
+    return render_template("vortex.html", active_tab="vortex")
 
 
 @app.route("/nuevo", methods=["GET", "POST"])
@@ -301,6 +326,43 @@ def api_inversion():
         "evolucion": evol,
         "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
         "top_items": top_items(movs),
+    })
+
+
+@app.route("/api/vortex")
+@login_requerido
+def api_vortex():
+    desde, hasta = parse_dates(request)
+    movs = query_movs(desde, hasta, categoria="VORTEX")
+    movs_ingreso = [m for m in movs if m.tipo == "Ingreso"]
+    movs_gasto   = [m for m in movs if m.tipo == "Gasto"]
+
+    ing  = sum(float(m.importe) for m in movs_ingreso)
+    gast = sum(float(m.importe) for m in movs_gasto)
+    utilidad = ing - gast
+    margen = round(utilidad / ing * 100, 1) if ing else 0
+
+    por_mes = agrupar_mensual(movs)
+    acum, evol = 0.0, []
+    for item in por_mes:
+        acum += item["ingresos"] - item["gastos"]
+        evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
+
+    ranking = ranking_por_descripcion(movs_ingreso)
+
+    return jsonify({
+        "kpis": {
+            "total_ingresos": round(ing, 2),
+            "total_gastos":   round(gast, 2),
+            "utilidad_neta":  round(utilidad, 2),
+            "margen_pct":     margen,
+            "num_alumnos":    len(ranking),
+        },
+        "evolucion": evol,
+        "por_mes": por_mes,
+        "ingresos_por_alumno": [{"label": r["alumno"], "value": r["total"]} for r in ranking[:8]],
+        "ranking_alumnos": ranking,
+        "gastos_por_concepto": top_items(movs_gasto),
     })
 
 
