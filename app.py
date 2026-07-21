@@ -63,15 +63,22 @@ def query_movs(desde, hasta, categoria=None, tipo=None):
     return q.order_by(Movimiento.fecha).all()
 
 
-def agrupar_mensual(movs):
+def agrupar_mensual(movs, desde, hasta):
     bucket = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
     for m in movs:
-        key = m.fecha.strftime("%b %Y")
+        key = (m.fecha.year, m.fecha.month)
         v = float(m.importe)
         bucket[key]["ingresos" if m.tipo == "Ingreso" else "gastos"] += v
-    def _sk(k):
-        return datetime.strptime(k, "%b %Y")
-    return [{"mes": k, **v} for k, v in sorted(bucket.items(), key=lambda x: _sk(x[0]))]
+    meses = []
+    y, mo = desde.year, desde.month
+    while (y, mo) <= (hasta.year, hasta.month):
+        v = bucket.get((y, mo), {"ingresos": 0.0, "gastos": 0.0})
+        meses.append({"mes": date_type(y, mo, 1).strftime("%b %Y"), "ingresos": v["ingresos"], "gastos": v["gastos"]})
+        mo += 1
+        if mo > 12:
+            mo = 1
+            y += 1
+    return meses
 
 
 def agrupar_diario(movs, desde, hasta):
@@ -257,7 +264,7 @@ def api_resumen():
             {"categoria": c, "total": round(t, 2)}
             for c, t in sorted(cat_map.items(), key=lambda x: -x[1])
         ],
-        "por_mes": agrupar_mensual(movs),
+        "por_mes": agrupar_mensual(movs, desde, hasta),
     })
 
 
@@ -268,7 +275,7 @@ def api_colchon():
     movs = query_movs(desde, hasta, categoria="Colchón")
     ing  = sum(float(m.importe) for m in movs if m.tipo == "Ingreso")
     gast = sum(float(m.importe) for m in movs if m.tipo == "Gasto")
-    por_mes = agrupar_mensual(movs)
+    por_mes = agrupar_mensual(movs, desde, hasta)
     acum, evol = 0.0, []
     for item in por_mes:
         acum += item["ingresos"] - item["gastos"]
@@ -286,7 +293,7 @@ def api_necesidades():
     desde, hasta = parse_dates(request)
     movs = query_movs(desde, hasta, categoria="Necesidades", tipo="Gasto")
     total = sum(float(m.importe) for m in movs)
-    por_mes = agrupar_mensual(movs)
+    por_mes = agrupar_mensual(movs, desde, hasta)
     meses = len(por_mes)
     return jsonify({
         "kpis": {
@@ -308,7 +315,7 @@ def api_diversion():
     total_div  = sum(float(m.importe) for m in movs_div)
     total_gast = sum(float(m.importe) for m in movs_all)
     pct = round(total_div / total_gast * 100, 1) if total_gast else 0
-    por_mes = agrupar_mensual(movs_div)
+    por_mes = agrupar_mensual(movs_div, desde, hasta)
     meses = len(por_mes)
     importes = [float(m.importe) for m in movs_div]
     return jsonify({
@@ -330,13 +337,14 @@ def api_inversion():
     movs = query_movs(desde, hasta, categoria="Inversión")
     ing  = sum(float(m.importe) for m in movs if m.tipo == "Ingreso")
     gast = sum(float(m.importe) for m in movs if m.tipo == "Gasto")
-    por_mes = agrupar_mensual(movs)
+    por_mes = agrupar_mensual(movs, desde, hasta)
     acum, evol = 0.0, []
     for item in por_mes:
         acum += item["gastos"]
         evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
+    meses_activos = len([m for m in por_mes if m["ingresos"] or m["gastos"]])
     return jsonify({
-        "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "meses_activos": len(por_mes)},
+        "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "meses_activos": meses_activos},
         "evolucion": evol,
         "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
         "top_items": top_items(movs),
@@ -356,7 +364,7 @@ def api_vortex():
     utilidad = ing - gast
     margen = round(utilidad / ing * 100, 1) if ing else 0
 
-    por_mes = agrupar_mensual(movs)
+    por_mes = agrupar_mensual(movs, desde, hasta)
     por_dia = agrupar_diario(movs, desde, hasta)
     acum, evol = 0.0, []
     for item in por_dia:
@@ -407,7 +415,7 @@ def api_inversiones():
         key = m.investment_asset_name or "Sin especificar"
         by_asset[key] += float(m.importe)
 
-    por_mes = agrupar_mensual(movs)
+    por_mes = agrupar_mensual(movs, desde, hasta)
     acum, evol = 0.0, []
     for item in por_mes:
         acum += item["gastos"]
