@@ -228,6 +228,7 @@
     .badge-purple { background: rgba(168,85,247,0.15); color: #a855f7; }
     .badge-indigo { background: rgba(99,102,241,0.15); color: #818cf8; }
     .badge-yellow { background: rgba(234,179,8,0.15);  color: #facc15; }
+    .badge-cyan   { background: rgba(6,182,212,0.15);  color: #06b6d4; }
 
     .chart-legend { display: flex; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
     .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
@@ -329,11 +330,13 @@
     .cat-necesidades::after{ background: linear-gradient(90deg,#6366f1,#818cf8); }
     .cat-diversion::after  { background: linear-gradient(90deg,#f97316,#fb923c); }
     .cat-inversion::after  { background: linear-gradient(90deg,#ca8a04,#facc15); }
+    .cat-vortex::after     { background: linear-gradient(90deg,#06b6d4,#22d3ee); }
     .cat-card:hover { transform: translateY(-4px); }
     .cat-colchon:hover    { border-color:rgba(34,197,94,0.4);  box-shadow:0 12px 32px rgba(34,197,94,0.12); }
     .cat-necesidades:hover{ border-color:rgba(99,102,241,0.4); box-shadow:0 12px 32px rgba(99,102,241,0.12); }
     .cat-diversion:hover  { border-color:rgba(249,115,22,0.4); box-shadow:0 12px 32px rgba(249,115,22,0.12); }
     .cat-inversion:hover  { border-color:rgba(234,179,8,0.4);  box-shadow:0 12px 32px rgba(234,179,8,0.12); }
+    .cat-vortex:hover      { border-color:rgba(6,182,212,0.4);  box-shadow:0 12px 32px rgba(6,182,212,0.12); }
     .cat-icon  { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .cat-name  { font-size:15px; font-weight:700; color:var(--text); letter-spacing:-0.2px; }
     .cat-desc  { font-size:11px; color:var(--text-muted); line-height:1.5; flex:1; }
@@ -476,6 +479,7 @@
       <a href="/dashboard/necesidades"  class="tab {% if active_tab=='necesidades' %}active{% endif %}" role="tab">Necesidades</a>
       <a href="/dashboard/diversion"    class="tab {% if active_tab=='diversion'   %}active{% endif %}" role="tab">Diversión</a>
       <a href="/dashboard/inversion"    class="tab {% if active_tab=='inversion'   %}active{% endif %}" role="tab">Inversión</a>
+      <a href="/dashboard/vortex"       class="tab {% if active_tab=='vortex'      %}active{% endif %}" role="tab">VORTEX</a>
       <a href="/inversiones"             class="tab {% if active_tab=='portafolio'  %}active{% endif %}" role="tab">Portafolio</a>
     </div>
 
@@ -607,12 +611,14 @@
     'Colchón':     '#22c55e',
     'Inversión':   '#3b82f6',
     'Diversión':   '#a855f7',
+    'VORTEX':      '#06b6d4',
   };
   const CAT_COLORS_DARK = {
     'Necesidades': '#fb923c',
     'Colchón':     '#4ade80',
     'Inversión':   '#60a5fa',
     'Diversión':   '#c084fc',
+    'VORTEX':      '#22d3ee',
   };
   function catColor(name) {
     const dark = document.documentElement.classList.contains('dark');
