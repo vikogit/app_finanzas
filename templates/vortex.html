@@ -233,7 +233,7 @@ function loadData(desde, hasta) {
                             <div class="donut-center-lbl">Gastos</div>`;
 
       chartArea = renderEtoroChart(
-        'chartArea', data.evolucion.map(d => d.mes), data.evolucion.map(d => d.acumulado),
+        'chartArea', data.evolucion.map(d => d.fecha), data.evolucion.map(d => d.acumulado),
         '#06b6d4', 6, 182, 212
       );
       chartDonutAlumno = renderDonutChart(

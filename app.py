@@ -74,6 +74,14 @@ def agrupar_mensual(movs):
     return [{"mes": k, **v} for k, v in sorted(bucket.items(), key=lambda x: _sk(x[0]))]
 
 
+def agrupar_diario(movs):
+    bucket = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
+    for m in movs:
+        v = float(m.importe)
+        bucket[m.fecha]["ingresos" if m.tipo == "Ingreso" else "gastos"] += v
+    return [{"fecha": k.strftime("%d %b"), **v} for k, v in sorted(bucket.items())]
+
+
 def top_items(movs, n=8):
     bucket = defaultdict(float)
     for m in movs:
@@ -343,10 +351,11 @@ def api_vortex():
     margen = round(utilidad / ing * 100, 1) if ing else 0
 
     por_mes = agrupar_mensual(movs)
+    por_dia = agrupar_diario(movs)
     acum, evol = 0.0, []
-    for item in por_mes:
+    for item in por_dia:
         acum += item["ingresos"] - item["gastos"]
-        evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
+        evol.append({"fecha": item["fecha"], "acumulado": round(acum, 2)})
 
     ranking = ranking_por_descripcion(movs_ingreso)
 
