@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
-from datetime import datetime, date as date_type
+from datetime import datetime, date as date_type, timedelta
 from functools import wraps
 from collections import defaultdict
 import os
@@ -74,12 +74,18 @@ def agrupar_mensual(movs):
     return [{"mes": k, **v} for k, v in sorted(bucket.items(), key=lambda x: _sk(x[0]))]
 
 
-def agrupar_diario(movs):
+def agrupar_diario(movs, desde, hasta):
     bucket = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
     for m in movs:
         v = float(m.importe)
         bucket[m.fecha]["ingresos" if m.tipo == "Ingreso" else "gastos"] += v
-    return [{"fecha": k.strftime("%d %b"), **v} for k, v in sorted(bucket.items())]
+    dias = []
+    dia = desde
+    while dia <= hasta:
+        v = bucket.get(dia, {"ingresos": 0.0, "gastos": 0.0})
+        dias.append({"fecha": dia.strftime("%d %b"), "ingresos": v["ingresos"], "gastos": v["gastos"]})
+        dia += timedelta(days=1)
+    return dias
 
 
 def top_items(movs, n=8):
@@ -351,7 +357,7 @@ def api_vortex():
     margen = round(utilidad / ing * 100, 1) if ing else 0
 
     por_mes = agrupar_mensual(movs)
-    por_dia = agrupar_diario(movs)
+    por_dia = agrupar_diario(movs, desde, hasta)
     acum, evol = 0.0, []
     for item in por_dia:
         acum += item["ingresos"] - item["gastos"]
