@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}VORTEX — App Finanzas{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1 class="page-title">VORTEX y TECSUP</h1>
+  <p class="page-sub">Tu emprendimiento educativo — ingresos, gastos y rentabilidad, alumno por alumno.</p>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">Período</span>
+  <input type="date" id="desde" class="date-input">
+  <span class="filter-sep">→</span>
+  <input type="date" id="hasta" class="date-input">
+  <button class="filter-btn" onclick="applyFilter()">Aplicar</button>
+  <div class="quick-filters">
+    <button class="qf" data-qf="mes"  onclick="setQuickFilter('mes')">Mes</button>
+    <button class="qf" data-qf="3m"   onclick="setQuickFilter('3m')">3M</button>
+    <button class="qf" data-qf="año"  onclick="setQuickFilter('año')">Año</button>
+    <button class="qf" data-qf="todo" onclick="setQuickFilter('todo')">Todo</button>
+  </div>
+</div>
+
+<div class="kpi-grid kpi-grid-4">
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(6,182,212,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+    </div>
+    <div class="kpi-label">Ingresos</div>
+    <div class="kpi-value" style="color:#06b6d4" id="kpi-ingresos">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(6,182,212,0.1)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#67e8f9" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6L9 12.75l4.306-4.307a11.95 11.95 0 015.814 5.519l2.74 1.22m0 0l-5.94 2.28m5.94-2.28l-2.28-5.941"/></svg>
+    </div>
+    <div class="kpi-label">Gastos</div>
+    <div class="kpi-value" style="color:#22d3ee" id="kpi-gastos">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(6,182,212,0.08)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a5f3fc" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75"/></svg>
+    </div>
+    <div class="kpi-label">Utilidad neta</div>
+    <div class="kpi-value" style="color:#67e8f9" id="kpi-utilidad">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(6,182,212,0.06)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cffafe" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z"/></svg>
+    </div>
+    <div class="kpi-label">Margen</div>
+    <div class="kpi-value" style="color:#a5f3fc" id="kpi-margen">— %</div>
+  </div>
+</div>
+
+<div class="charts-grid-main">
+  <div class="card card-p">
+    <div class="chart-title">
+      Evolución de utilidad acumulada
+      <span class="chart-badge badge-cyan">Área · eToro</span>
+    </div>
+    <div class="chart-area-wrap">
+      <canvas id="chartArea"></canvas>
+    </div>
+  </div>
+  <div class="card card-p">
+    <div class="chart-title">
+      Ingresos por alumno
+      <span class="chart-badge badge-cyan">Pastel</span>
+    </div>
+    <div class="chart-donut-wrap" style="position:relative">
+      <canvas id="chartDonutAlumno"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="charts-grid" style="margin-bottom:28px">
+  <div class="card card-p">
+    <div class="chart-title">Ingresos vs Gastos por mes</div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Ingresos</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Gastos</div>
+    </div>
+    <div style="position:relative;height:220px">
+      <canvas id="chartBar"></canvas>
+    </div>
+  </div>
+  <div class="card card-p">
+    <div class="chart-title">
+      Gastos por concepto
+      <span class="chart-badge badge-cyan">Pastel</span>
+    </div>
+    <div class="chart-donut-wrap" style="position:relative">
+      <canvas id="chartDonutGasto"></canvas>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+  <h2 style="font-size:15px;font-weight:700;color:var(--text)">Ranking de alumnos por ingresos</h2>
+  <span style="font-size:12px;color:var(--text-muted)" id="lb-subtitle">— alumnos activos</span>
+</div>
+
+<div class="tbl-card">
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Alumno</th>
+          <th style="text-align:right">Total pagado</th>
+          <th style="text-align:right">N° pagos</th>
+          <th style="text-align:right">% del total</th>
+        </tr>
+      </thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+
+    <div class="empty-state" id="lb-empty" style="display:none">
+      <svg class="empty-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.4" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>
+      </svg>
+      <p style="font-size:13px;margin-bottom:8px">Aún no hay ingresos de alumnos registrados en este período.</p>
+      <a href="/nuevo" style="font-size:12px;font-weight:600;color:#06b6d4;text-decoration:none">Registrar el primero →</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chartArea = null, chartDonutAlumno = null, chartBar = null, chartDonutGasto = null;
+
+function fmtMoney(v) {
+  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function renderBarVortex(porMes) {
+  const ctx = document.getElementById('chartBar').getContext('2d');
+  const dark = document.documentElement.classList.contains('dark');
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: porMes.map(d => d.mes),
+      datasets: [
+        { label: 'Ingresos', data: porMes.map(d => d.ingresos), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
+        { label: 'Gastos',   data: porMes.map(d => d.gastos),   backgroundColor: 'rgba(248,113,113,0.7)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: {
+          grid: { color: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+          ticks: { color: dark ? 'rgba(255,255,255,0.4)' : '#64748b' },
+        },
+        y: {
+          grid: { color: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+          ticks: {
+            color: dark ? 'rgba(255,255,255,0.4)' : '#64748b',
+            callback: v => 'S/ ' + v.toLocaleString('es-PE'),
+          }
+        }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function renderLeaderboard(ranking, numAlumnos) {
+  document.getElementById('lb-subtitle').textContent =
+    numAlumnos + (numAlumnos === 1 ? ' alumno activo' : ' alumnos activos');
+
+  const tbody = document.getElementById('lb-body');
+  const emptyState = document.getElementById('lb-empty');
+  tbody.innerHTML = '';
+
+  if (!ranking.length) {
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  ranking.forEach((r, i) => {
+    const tr = document.createElement('tr');
+
+    const tdPos = document.createElement('td');
+    tdPos.className = 'muted';
+    tdPos.textContent = i + 1;
+
+    const tdAlumno = document.createElement('td');
+    tdAlumno.style.fontWeight = '600';
+    tdAlumno.textContent = r.alumno;
+
+    const tdTotal = document.createElement('td');
+    tdTotal.className = 'right';
+    tdTotal.style.fontWeight = '700';
+    tdTotal.style.color = '#06b6d4';
+    tdTotal.textContent = fmtMoney(r.total);
+
+    const tdPagos = document.createElement('td');
+    tdPagos.className = 'right muted';
+    tdPagos.textContent = r.num_pagos;
+
+    const tdPct = document.createElement('td');
+    tdPct.className = 'right muted';
+    tdPct.textContent = r.pct + '%';
+
+    tr.append(tdPos, tdAlumno, tdTotal, tdPagos, tdPct);
+    tbody.appendChild(tr);
+  });
+}
+
+function loadData(desde, hasta) {
+  fetch(`/api/vortex?desde=${desde}&hasta=${hasta}`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('kpi-ingresos').textContent = fmtMoney(data.kpis.total_ingresos);
+      document.getElementById('kpi-gastos').textContent   = fmtMoney(data.kpis.total_gastos);
+
+      const kpiUtilidad = document.getElementById('kpi-utilidad');
+      kpiUtilidad.textContent = fmtMoney(data.kpis.utilidad_neta);
+      kpiUtilidad.style.color = data.kpis.utilidad_neta >= 0 ? '#06b6d4' : '#f87171';
+
+      document.getElementById('kpi-margen').textContent = data.kpis.margen_pct + ' %';
+
+      [chartArea, chartDonutAlumno, chartBar, chartDonutGasto].forEach(c => {
+        if (c) { c.destroy(); window._charts = window._charts.filter(x => x !== c); }
+      });
+
+      const centerAlumno = `<div class="donut-center-val" style="color:#06b6d4">${fmtMoney(data.kpis.total_ingresos)}</div>
+                             <div class="donut-center-lbl">Ingresos</div>`;
+      const centerGasto = `<div class="donut-center-val" style="color:#06b6d4">${fmtMoney(data.kpis.total_gastos)}</div>
+                            <div class="donut-center-lbl">Gastos</div>`;
+
+      chartArea = renderEtoroChart(
+        'chartArea', data.evolucion.map(d => d.mes), data.evolucion.map(d => d.acumulado),
+        '#06b6d4', 6, 182, 212
+      );
+      chartDonutAlumno = renderDonutChart(
+        'chartDonutAlumno',
+        data.ingresos_por_alumno.length ? data.ingresos_por_alumno : [{label:'Sin datos',value:1}],
+        centerAlumno
+      );
+      chartBar = renderBarVortex(data.por_mes);
+      chartDonutGasto = renderDonutChart(
+        'chartDonutGasto',
+        data.gastos_por_concepto.length ? data.gastos_por_concepto : [{label:'Sin datos',value:1}],
+        centerGasto
+      );
+
+      window._charts.push(chartArea, chartDonutAlumno, chartBar, chartDonutGasto);
+
+      renderLeaderboard(data.ranking_alumnos, data.kpis.num_alumnos);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const d = getDefaultDates();
+  document.getElementById('desde').value = d.desde;
+  document.getElementById('hasta').value = d.hasta;
+  document.querySelector('[data-qf="mes"]').classList.add('active');
+  loadData(d.desde, d.hasta);
+});
+</script>
+{% endblock %}
