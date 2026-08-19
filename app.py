@@ -206,6 +206,22 @@ def dashboard_earnings():
 @login_requerido
 def nuevo():
     if request.method == "POST":
+        if request.form.get("tipo") == "Meta":
+            try:
+                fecha_inicio = datetime.strptime(request.form["fecha"], "%Y-%m-%d").date()
+                fecha_fin    = datetime.strptime(request.form["fecha_fin"], "%Y-%m-%d").date()
+                monto_diario = float(request.form["importe"])
+                if fecha_fin < fecha_inicio:
+                    return "Error al guardar: la fecha fin no puede ser anterior a la fecha inicio"
+                if monto_diario <= 0:
+                    return "Error al guardar: el monto diario debe ser mayor a 0"
+                meta = MetaIngreso(fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, monto_diario=monto_diario)
+                db.session.add(meta)
+                db.session.commit()
+                return redirect(url_for("dashboard_earnings"))
+            except Exception as e:
+                db.session.rollback()
+                return f"Error al guardar: {str(e)}"
         try:
             m = Movimiento(
                 fecha=datetime.strptime(request.form["fecha"], "%Y-%m-%d").date(),

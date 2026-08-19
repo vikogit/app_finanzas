@@ -36,8 +36,13 @@
   <form method="POST" id="form-nuevo">
 
     <div class="form-field">
-      <label for="fecha" class="form-label">Fecha</label>
+      <label for="fecha" class="form-label" id="fecha-label">Fecha</label>
       <input type="date" id="fecha" name="fecha" required class="form-input">
+    </div>
+
+    <div class="form-field" id="meta-fecha-fin-field" style="display:none">
+      <label for="fecha_fin" class="form-label">Hasta</label>
+      <input type="date" id="fecha_fin" name="fecha_fin" class="form-input">
     </div>
 
     <div class="form-field">
@@ -50,6 +55,10 @@
         <div class="pill-radio">
           <input type="radio" id="ingreso" name="tipo" value="Ingreso">
           <label for="ingreso">Ingreso</label>
+        </div>
+        <div class="pill-radio" id="tipo-meta-wrap" style="display:none">
+          <input type="radio" id="meta" name="tipo" value="Meta">
+          <label for="meta">Meta</label>
         </div>
       </div>
     </div>
@@ -131,7 +140,7 @@
     </div>
 
     <div class="form-field" id="importe-field">
-      <label for="importe" class="form-label">Importe (S/)</label>
+      <label for="importe" class="form-label" id="importe-label">Importe (S/)</label>
       <div class="form-input-prefix">
         <span class="form-prefix">S/</span>
         <input type="number" id="importe" name="importe" step="0.01" min="0" required
@@ -177,6 +186,25 @@
     return tipo === 'Gasto' && cat === 'Inversión';
   }
 
+  function isMeta() {
+    return document.querySelector('input[name="tipo"]:checked')?.value === 'Meta';
+  }
+
+  function updateTipoMetaVisibility() {
+    const cat = document.querySelector('input[name="categoria"]:checked')?.value;
+    const wrap = document.getElementById('tipo-meta-wrap');
+    const metaRadio = document.getElementById('meta');
+    if (cat === 'Earnings') {
+      wrap.style.display = '';
+    } else {
+      wrap.style.display = 'none';
+      if (metaRadio.checked) {
+        metaRadio.checked = false;
+        document.getElementById('gasto').checked = true;
+      }
+    }
+  }
+
   function updateDescripcionHint() {
     const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
     const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
@@ -192,13 +220,41 @@
   }
 
   function updateVisibility() {
+    updateTipoMetaVisibility();
     updateDescripcionHint();
+
+    const meta = isMeta();
+    const fechaLabel = document.getElementById('fecha-label');
+    const importeLabel = document.getElementById('importe-label');
+    const fechaFinField = document.getElementById('meta-fecha-fin-field');
+    const fechaFinInput = document.getElementById('fecha_fin');
+    const descField = document.getElementById('descripcion-field');
+    const desc = document.getElementById('descripcion');
+
+    if (meta) {
+      fechaLabel.textContent = 'Desde';
+      importeLabel.textContent = 'Meta diaria (S/)';
+      fechaFinField.style.display = '';
+      fechaFinInput.setAttribute('required', '');
+      descField.style.display = 'none';
+      desc.removeAttribute('required');
+      document.getElementById('asset-block').style.display = 'none';
+      document.getElementById('usd-block').style.display = 'none';
+      document.getElementById('importe-field').style.display = '';
+      document.getElementById('importe').setAttribute('required', '');
+      return;
+    }
+    fechaLabel.textContent = 'Fecha';
+    importeLabel.textContent = 'Importe (S/)';
+    fechaFinField.style.display = 'none';
+    fechaFinInput.removeAttribute('required');
+    fechaFinInput.value = '';
+
     const show = isInversionGasto();
     document.getElementById('asset-block').style.display      = show ? '' : 'none';
     document.getElementById('usd-block').style.display        = show ? '' : 'none';
     document.getElementById('importe-field').style.display    = show ? 'none' : '';
     document.getElementById('descripcion-field').style.display = show ? 'none' : '';
-    const desc = document.getElementById('descripcion');
     const imp  = document.getElementById('importe');
     if (show) {
       imp.removeAttribute('required');
@@ -305,6 +361,27 @@
 
   // ── Validación al enviar ──────────────────────────────────────────────
   document.getElementById('form-nuevo').addEventListener('submit', function(e) {
+    if (isMeta()) {
+      const desde = document.getElementById('fecha').value;
+      const hasta = document.getElementById('fecha_fin').value;
+      const monto = document.getElementById('importe').value;
+      if (!desde || !hasta) {
+        e.preventDefault();
+        alert('Por favor completa las fechas de inicio y fin de la meta.');
+        return;
+      }
+      if (hasta < desde) {
+        e.preventDefault();
+        alert('La fecha "Hasta" no puede ser anterior a "Desde".');
+        return;
+      }
+      if (!monto || parseFloat(monto) <= 0) {
+        e.preventDefault();
+        alert('Por favor ingresa un monto de meta diaria mayor a 0.');
+        return;
+      }
+      return;
+    }
     if (!isInversionGasto()) return;
     const assetType = document.getElementById('investment_asset_type').value;
     const assetName = document.getElementById('investment_asset_name').value;

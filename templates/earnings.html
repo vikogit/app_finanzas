@@ -136,10 +136,10 @@
 
 <div class="metas-hdr">
   <h2 style="font-size:15px;font-weight:700;color:var(--text)">Metas de ingreso diario</h2>
-  <button class="btn-add-meta" onclick="openMetaModal()">
+  <a href="/nuevo" class="btn-add-meta" style="text-decoration:none">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
     Nueva meta
-  </button>
+  </a>
 </div>
 
 <div class="tbl-card">
@@ -157,7 +157,7 @@
     </table>
     <div class="empty-state" id="metas-empty" style="display:none">
       <p style="font-size:13px;margin-bottom:8px">Aún no has definido ninguna meta de ingreso.</p>
-      <a href="#" onclick="openMetaModal();return false" style="font-size:12px;font-weight:600;color:#0d9488;text-decoration:none">Crear la primera →</a>
+      <a href="/nuevo" style="font-size:12px;font-weight:600;color:#0d9488;text-decoration:none">Crear la primera →</a>
     </div>
   </div>
 </div>
