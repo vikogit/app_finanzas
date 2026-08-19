@@ -429,6 +429,13 @@ def api_vortex():
     })
 
 
+_EPOCH = date_type(1970, 1, 1)
+
+
+def to_epoch_day(d):
+    return (d - _EPOCH).days
+
+
 @app.route("/api/earnings")
 @login_requerido
 def api_earnings():
@@ -445,18 +452,37 @@ def api_earnings():
 
     fechas = sorted(por_fecha.keys())
     neto = [round(por_fecha[f]["ingresos"] - por_fecha[f]["gastos"], 2) for f in fechas]
+    sma21 = sma(neto, 21)
+    sma55 = sma(neto, 55)
 
-    metas = MetaIngreso.query.order_by(MetaIngreso.fecha_inicio).all()
+    def puntos(valores):
+        return [{"x": to_epoch_day(fechas[i]), "y": valores[i]} for i in range(len(fechas))]
 
-    def meta_en(fecha):
-        activa = None
-        for meta in metas:
-            if meta.fecha_inicio <= fecha <= meta.fecha_fin:
-                if activa is None or meta.fecha_inicio > activa.fecha_inicio:
-                    activa = meta
-        return float(activa.monto_diario) if activa else None
+    todas_metas = MetaIngreso.query.order_by(MetaIngreso.fecha_inicio).all()
 
-    meta_line = [meta_en(f) for f in fechas]
+    # Línea de meta: independiente de si hay movimientos registrados o no —
+    # se dibuja mientras haya una meta activa que se cruce con el período filtrado.
+    meta_linea = []
+    prev_fin = None
+    for m in todas_metas:
+        seg_ini = max(m.fecha_inicio, desde)
+        seg_fin = min(m.fecha_fin, hasta)
+        if seg_ini > seg_fin:
+            continue
+        if prev_fin is not None and seg_ini > prev_fin + timedelta(days=1):
+            meta_linea.append({"x": to_epoch_day(prev_fin + timedelta(days=1)), "y": None})
+        monto = float(m.monto_diario)
+        meta_linea.append({"x": to_epoch_day(seg_ini), "y": monto})
+        meta_linea.append({"x": to_epoch_day(seg_fin), "y": monto})
+        prev_fin = seg_fin
+
+    hoy = date_type.today()
+    meta_hoy_activa = None
+    for m in todas_metas:
+        if m.fecha_inicio <= hoy <= m.fecha_fin:
+            if meta_hoy_activa is None or m.fecha_inicio > meta_hoy_activa.fecha_inicio:
+                meta_hoy_activa = m
+    meta_hoy = float(meta_hoy_activa.monto_diario) if meta_hoy_activa else None
 
     return jsonify({
         "kpis": {
@@ -466,13 +492,12 @@ def api_earnings():
             "dias_registrados": len(fechas),
         },
         "barras": {
-            "fechas":     [f.strftime("%Y-%m-%d") for f in fechas],
-            "fechas_fmt": [f.strftime("%d %b") for f in fechas],
-            "neto":  neto,
-            "sma21": sma(neto, 21),
-            "sma55": sma(neto, 55),
-            "meta":  meta_line,
+            "neto":  puntos(neto),
+            "sma21": puntos(sma21),
+            "sma55": puntos(sma55),
         },
+        "meta_linea": meta_linea,
+        "meta_hoy": meta_hoy,
         "fuentes": top_items(movs_ingreso),
     })
 

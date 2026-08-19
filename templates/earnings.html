@@ -14,6 +14,15 @@
   .zoom-btn:hover { color:var(--text); background:var(--bg-card2); }
   .zoom-hint { font-size:10px; color:var(--text-subtle); }
 
+  .meta-hoy-badge {
+    position:absolute; top:6px; right:6px; z-index:5; pointer-events:none;
+    display:flex; flex-direction:column; align-items:flex-end; gap:1px;
+    background:#38bdf8; color:#04222e; padding:5px 10px; border-radius:9px;
+    box-shadow:0 4px 14px rgba(56,189,248,0.35);
+  }
+  .meta-hoy-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; opacity:0.75; }
+  .meta-hoy-value { font-size:13px; font-weight:800; line-height:1.1; }
+
   .metas-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
   .btn-add-meta {
     display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:9px;
@@ -119,6 +128,10 @@
   </div>
   <div style="position:relative;height:340px">
     <canvas id="chartEarnings"></canvas>
+    <div class="meta-hoy-badge" id="meta-hoy-badge" style="display:none">
+      <span class="meta-hoy-label">Meta hoy</span>
+      <span class="meta-hoy-value" id="meta-hoy-value">S/ —</span>
+    </div>
   </div>
 </div>
 
@@ -207,7 +220,15 @@ function fmtMoney(v) {
   return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-function renderChartEarnings(barras) {
+function epochToDate(epochDay) {
+  return new Date(epochDay * 86400000);
+}
+
+function fmtEpochDay(epochDay) {
+  return epochToDate(epochDay).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+}
+
+function renderChartEarnings(barras, metaLinea) {
   const ctx = document.getElementById('chartEarnings').getContext('2d');
   const dark = document.documentElement.classList.contains('dark');
   const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
@@ -215,14 +236,15 @@ function renderChartEarnings(barras) {
 
   return new Chart(ctx, {
     data: {
-      labels: barras.fechas_fmt,
       datasets: [
         {
           type: 'bar',
           label: 'Neto diario',
           data: barras.neto,
-          backgroundColor: (c) => (c.raw >= 0 ? 'rgba(34,197,94,0.85)' : 'rgba(239,68,68,0.85)'),
+          backgroundColor: (c) => (c.raw && c.raw.y >= 0 ? 'rgba(34,197,94,0.85)' : 'rgba(239,68,68,0.85)'),
           borderRadius: 3,
+          barThickness: 22,
+          maxBarThickness: 30,
           order: 3,
         },
         {
@@ -250,12 +272,12 @@ function renderChartEarnings(barras) {
         {
           type: 'line',
           label: 'Meta diaria',
-          data: barras.meta,
+          data: metaLinea,
           borderColor: '#38bdf8',
           borderWidth: 2,
           borderDash: [4, 3],
           pointRadius: 0,
-          stepped: true,
+          stepped: false,
           spanGaps: false,
           order: 0,
         },
@@ -263,11 +285,12 @@ function renderChartEarnings(barras) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
+      interaction: { mode: 'x', intersect: false },
       scales: {
         x: {
+          type: 'linear',
           grid: { color: gridC },
-          ticks: { color: tickC, autoSkip: true, maxRotation: 0 },
+          ticks: { color: tickC, maxRotation: 0, callback: v => fmtEpochDay(v) },
         },
         y: {
           grid: { color: gridC },
@@ -282,7 +305,10 @@ function renderChartEarnings(barras) {
           bodyColor: '#f1f5f9',
           borderColor: 'rgba(13,148,136,0.35)',
           borderWidth: 1, padding: 12, cornerRadius: 10,
-          callbacks: { label: c => `${c.dataset.label}: ${fmtMoney(c.raw ?? 0)}` }
+          callbacks: {
+            title: items => items.length ? fmtEpochDay(items[0].parsed.x) : '',
+            label: c => `${c.dataset.label}: ${fmtMoney(c.parsed.y ?? 0)}`,
+          }
         },
         zoom: {
           pan: { enabled: true, mode: 'x' },
@@ -403,11 +429,19 @@ function loadData(desde, hasta) {
       kpiBalance.style.color = data.kpis.balance_neto >= 0 ? '#0d9488' : '#f87171';
       document.getElementById('kpi-dias').textContent = data.kpis.dias_registrados;
 
+      const badge = document.getElementById('meta-hoy-badge');
+      if (data.meta_hoy != null) {
+        document.getElementById('meta-hoy-value').textContent = fmtMoney(data.meta_hoy);
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+
       [chartEarnings, chartFuentes].forEach(c => {
         if (c) { c.destroy(); window._charts = window._charts.filter(x => x !== c); }
       });
 
-      chartEarnings = renderChartEarnings(data.barras);
+      chartEarnings = renderChartEarnings(data.barras, data.meta_linea);
       chartFuentes = renderDonutChart(
         'chartFuentes',
         data.fuentes.length ? data.fuentes : [{label:'Sin datos', value:1}],
