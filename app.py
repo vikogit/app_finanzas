@@ -38,6 +38,14 @@ class Movimiento(db.Model):
     investment_asset_name = db.Column(db.String(100), nullable=True)
 
 
+class MetaIngreso(db.Model):
+    __tablename__ = "metas_ingreso"
+    id           = db.Column(db.Integer, primary_key=True)
+    fecha_inicio = db.Column(db.Date, nullable=False)
+    fecha_fin    = db.Column(db.Date, nullable=False)
+    monto_diario = db.Column(db.Numeric(10, 2), nullable=False)
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def parse_dates(req):
@@ -93,6 +101,16 @@ def agrupar_diario(movs, desde, hasta):
         dias.append({"fecha": dia.strftime("%d %b"), "ingresos": v["ingresos"], "gastos": v["gastos"]})
         dia += timedelta(days=1)
     return dias
+
+
+def sma(values, window):
+    out = []
+    for i in range(len(values)):
+        if i + 1 < window:
+            out.append(None)
+        else:
+            out.append(round(sum(values[i + 1 - window:i + 1]) / window, 2))
+    return out
 
 
 def top_items(movs, n=8):
@@ -176,6 +194,12 @@ def dashboard_inversion():
 @login_requerido
 def dashboard_vortex():
     return render_template("vortex.html", active_tab="vortex")
+
+
+@app.route("/dashboard/earnings")
+@login_requerido
+def dashboard_earnings():
+    return render_template("earnings.html", active_tab="earnings")
 
 
 @app.route("/nuevo", methods=["GET", "POST"])
@@ -387,6 +411,111 @@ def api_vortex():
         "ranking_alumnos": ranking,
         "gastos_por_concepto": top_items(movs_gasto),
     })
+
+
+@app.route("/api/earnings")
+@login_requerido
+def api_earnings():
+    desde, hasta = parse_dates(request)
+    movs = query_movs(desde, hasta, categoria="Earnings")
+    movs_ingreso = [m for m in movs if m.tipo == "Ingreso"]
+    ing  = sum(float(m.importe) for m in movs_ingreso)
+    gast = sum(float(m.importe) for m in movs if m.tipo == "Gasto")
+
+    por_fecha = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
+    for m in movs:
+        v = float(m.importe)
+        por_fecha[m.fecha]["ingresos" if m.tipo == "Ingreso" else "gastos"] += v
+
+    fechas = sorted(por_fecha.keys())
+    neto = [round(por_fecha[f]["ingresos"] - por_fecha[f]["gastos"], 2) for f in fechas]
+
+    metas = MetaIngreso.query.order_by(MetaIngreso.fecha_inicio).all()
+
+    def meta_en(fecha):
+        activa = None
+        for meta in metas:
+            if meta.fecha_inicio <= fecha <= meta.fecha_fin:
+                if activa is None or meta.fecha_inicio > activa.fecha_inicio:
+                    activa = meta
+        return float(activa.monto_diario) if activa else None
+
+    meta_line = [meta_en(f) for f in fechas]
+
+    return jsonify({
+        "kpis": {
+            "total_ingresos":   round(ing, 2),
+            "total_gastos":     round(gast, 2),
+            "balance_neto":     round(ing - gast, 2),
+            "dias_registrados": len(fechas),
+        },
+        "barras": {
+            "fechas":     [f.strftime("%Y-%m-%d") for f in fechas],
+            "fechas_fmt": [f.strftime("%d %b") for f in fechas],
+            "neto":  neto,
+            "sma21": sma(neto, 21),
+            "sma55": sma(neto, 55),
+            "meta":  meta_line,
+        },
+        "fuentes": top_items(movs_ingreso),
+    })
+
+
+@app.route("/api/earnings/metas", methods=["GET", "POST"])
+@login_requerido
+def api_earnings_metas():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            fecha_inicio = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
+            fecha_fin    = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
+            monto_diario = float(data["monto_diario"])
+            if fecha_fin < fecha_inicio:
+                return jsonify({"error": "La fecha fin no puede ser anterior a la fecha inicio"}), 400
+            if monto_diario <= 0:
+                return jsonify({"error": "El monto diario debe ser mayor a 0"}), 400
+            m = MetaIngreso(fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, monto_diario=monto_diario)
+            db.session.add(m)
+            db.session.commit()
+            return jsonify({"id": m.id}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    metas = MetaIngreso.query.order_by(MetaIngreso.fecha_inicio.desc()).all()
+    return jsonify([{
+        "id":           m.id,
+        "fecha_inicio": m.fecha_inicio.strftime("%Y-%m-%d"),
+        "fecha_fin":    m.fecha_fin.strftime("%Y-%m-%d"),
+        "monto_diario": float(m.monto_diario),
+    } for m in metas])
+
+
+@app.route("/api/earnings/metas/<int:id>", methods=["PUT", "DELETE"])
+@login_requerido
+def api_earnings_meta_detail(id):
+    m = MetaIngreso.query.get_or_404(id)
+
+    if request.method == "DELETE":
+        db.session.delete(m)
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        fecha_inicio = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
+        fecha_fin    = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
+        monto_diario = float(data["monto_diario"])
+        if fecha_fin < fecha_inicio:
+            return jsonify({"error": "La fecha fin no puede ser anterior a la fecha inicio"}), 400
+        if monto_diario <= 0:
+            return jsonify({"error": "El monto diario debe ser mayor a 0"}), 400
+        m.fecha_inicio, m.fecha_fin, m.monto_diario = fecha_inicio, fecha_fin, monto_diario
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/inversiones")

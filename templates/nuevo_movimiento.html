@@ -77,6 +77,10 @@
           <input type="radio" id="vortex" name="categoria" value="VORTEX">
           <label for="vortex">VORTEX</label>
         </div>
+        <div class="pill-radio">
+          <input type="radio" id="earnings" name="categoria" value="Earnings">
+          <label for="earnings">Earnings</label>
+        </div>
       </div>
     </div>
 
@@ -173,7 +177,22 @@
     return tipo === 'Gasto' && cat === 'Inversión';
   }
 
+  function updateDescripcionHint() {
+    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+    const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
+    const label = document.querySelector('#descripcion-field .form-label');
+    const input = document.getElementById('descripcion');
+    if (cat === 'Earnings' && tipo === 'Ingreso') {
+      label.textContent = 'Fuente de ingreso';
+      input.placeholder = 'Ej: Sueldo, Freelance, Clases particulares...';
+    } else {
+      label.textContent = 'Descripción';
+      input.placeholder = 'Ej: fruta, pasajes, interés, ahorro...';
+    }
+  }
+
   function updateVisibility() {
+    updateDescripcionHint();
     const show = isInversionGasto();
     document.getElementById('asset-block').style.display      = show ? '' : 'none';
     document.getElementById('usd-block').style.display        = show ? '' : 'none';
