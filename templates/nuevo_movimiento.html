@@ -105,6 +105,14 @@
       </label>
     </div>
 
+    <!-- Pago en dólares: solo visible en Necesidades + Gasto, opcional -->
+    <div class="form-field" id="necesidades-usd-check-block" style="display:none">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text)">
+        <input type="checkbox" id="necesidades_usd_check" style="width:16px;height:16px;accent-color:#818cf8">
+        Pago en dólares
+      </label>
+    </div>
+
     <!-- Meta de días trabajados al mes: solo visible en categoría Earnings, una meta por mes -->
     <div class="form-field" id="dias-trabajo-block" style="display:none">
       <span class="form-label">Meta de días trabajados al mes</span>
@@ -208,6 +216,26 @@
     const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
     const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
     return tipo === 'Gasto' && cat === 'Inversión';
+  }
+
+  function isNecesidadesGasto() {
+    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+    const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
+    return tipo === 'Gasto' && cat === 'Necesidades';
+  }
+
+  function isNecesidadesUsd() {
+    return isNecesidadesGasto() && document.getElementById('necesidades_usd_check').checked;
+  }
+
+  function updateNecesidadesUsdCheckVisibility() {
+    const block = document.getElementById('necesidades-usd-check-block');
+    if (isNecesidadesGasto()) {
+      block.style.display = '';
+    } else {
+      block.style.display = 'none';
+      document.getElementById('necesidades_usd_check').checked = false;
+    }
   }
 
   function isMeta() {
@@ -315,6 +343,7 @@
     updateTipoMetaVisibility();
     updateDescripcionHint();
     updateDiasTrabajoVisibility();
+    updateNecesidadesUsdCheckVisibility();
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');
@@ -374,21 +403,26 @@
       document.getElementById('pagado_con_tarjeta').checked = false;
     }
 
-    const show = isInversionGasto();
-    document.getElementById('asset-block').style.display      = show ? '' : 'none';
-    document.getElementById('usd-block').style.display        = show ? '' : 'none';
-    document.getElementById('importe-field').style.display    = show ? 'none' : '';
-    document.getElementById('descripcion-field').style.display = show ? 'none' : '';
-    const imp  = document.getElementById('importe');
-    if (show) {
+    const showAsset = isInversionGasto();
+    const showUsd = showAsset || isNecesidadesUsd();
+    document.getElementById('asset-block').style.display      = showAsset ? '' : 'none';
+    document.getElementById('usd-block').style.display        = showUsd ? '' : 'none';
+    document.getElementById('importe-field').style.display    = showUsd ? 'none' : '';
+    document.getElementById('descripcion-field').style.display = showAsset ? 'none' : '';
+
+    const imp = document.getElementById('importe');
+    if (showUsd) {
       imp.removeAttribute('required');
-      desc.removeAttribute('required');
       updateConversion();
     } else {
       imp.setAttribute('required', '');
-      desc.setAttribute('required', '');
       document.getElementById('monto-usd').value = '';
       document.getElementById('usd-info').textContent = '';
+    }
+    if (showAsset) {
+      desc.removeAttribute('required');
+    } else {
+      desc.setAttribute('required', '');
       resetAssetSelector();
     }
   }
@@ -549,6 +583,7 @@
   );
 
   document.getElementById('dias-trabajo-mes').addEventListener('change', loadDiasTrabajoParaMes);
+  document.getElementById('necesidades_usd_check').addEventListener('change', updateVisibility);
 
   fetchRate().then(updateVisibility);
 </script>
