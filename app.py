@@ -57,28 +57,30 @@ class MetaIngreso(db.Model):
     monto_diario = db.Column(db.Numeric(10, 2), nullable=False)
 
 
-class ConfigEarnings(db.Model):
-    __tablename__ = "config_earnings"
-    id                = db.Column(db.Integer, primary_key=True)
-    dias_trabajo_mes  = db.Column(db.Integer, nullable=False, default=20)
+class MetaDiasMes(db.Model):
+    __tablename__ = "metas_dias_mes"
+    id        = db.Column(db.Integer, primary_key=True)
+    year      = db.Column(db.Integer, nullable=False)
+    month     = db.Column(db.Integer, nullable=False)
+    dias_meta = db.Column(db.Integer, nullable=False)
+    __table_args__ = (db.UniqueConstraint("year", "month", name="uq_metas_dias_mes_year_month"),)
 
 
-def get_dias_trabajo_mes():
-    cfg = ConfigEarnings.query.first()
-    if not cfg:
-        cfg = ConfigEarnings(dias_trabajo_mes=20)
-        db.session.add(cfg)
-        db.session.commit()
-    return cfg.dias_trabajo_mes
+DIAS_META_DEFAULT = 20
 
 
-def set_dias_trabajo_mes(n):
-    cfg = ConfigEarnings.query.first()
-    if not cfg:
-        cfg = ConfigEarnings(dias_trabajo_mes=n)
-        db.session.add(cfg)
+def get_dias_meta_mes(year, month):
+    row = MetaDiasMes.query.filter_by(year=year, month=month).first()
+    return row.dias_meta if row else DIAS_META_DEFAULT
+
+
+def set_dias_meta_mes(year, month, n):
+    row = MetaDiasMes.query.filter_by(year=year, month=month).first()
+    if row:
+        row.dias_meta = n
     else:
-        cfg.dias_trabajo_mes = n
+        row = MetaDiasMes(year=year, month=month, dias_meta=n)
+        db.session.add(row)
     db.session.commit()
 
 
@@ -598,19 +600,33 @@ def api_earnings_meta_detail(id):
 @app.route("/api/earnings/config", methods=["GET", "POST"])
 @login_requerido
 def api_earnings_config():
+    hoy = hoy_local()
+
     if request.method == "POST":
         data = request.get_json(force=True, silent=True) or {}
         try:
-            n = int(data["dias_trabajo_mes"])
+            year  = int(data.get("year", hoy.year))
+            month = int(data.get("month", hoy.month))
+            n     = int(data["dias_trabajo_mes"])
+            if not (1 <= month <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
             if n <= 0 or n > 31:
                 return jsonify({"error": "Ingresa un número de días entre 1 y 31"}), 400
-            set_dias_trabajo_mes(n)
-            return jsonify({"ok": True, "dias_trabajo_mes": n})
+            set_dias_meta_mes(year, month, n)
+            return jsonify({"ok": True, "year": year, "month": month, "dias_trabajo_mes": n})
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": str(e)}), 400
 
-    return jsonify({"dias_trabajo_mes": get_dias_trabajo_mes()})
+    try:
+        year  = int(request.args.get("year", hoy.year))
+        month = int(request.args.get("month", hoy.month))
+        if not (1 <= month <= 12):
+            raise ValueError
+    except (TypeError, ValueError):
+        year, month = hoy.year, hoy.month
+
+    return jsonify({"year": year, "month": month, "dias_trabajo_mes": get_dias_meta_mes(year, month)})
 
 
 MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -651,7 +667,7 @@ def api_earnings_calendario():
         "primer_dia_semana": primer_dia_semana,
         "dias_con_ingreso": dias_con_ingreso,
         "dias_trabajados": len(dias_con_ingreso),
-        "meta_dias_mes": get_dias_trabajo_mes(),
+        "meta_dias_mes": get_dias_meta_mes(year, month),
     })
 
 

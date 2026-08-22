@@ -93,10 +93,11 @@
       </div>
     </div>
 
-    <!-- Meta de días trabajados al mes: solo visible en categoría Earnings -->
+    <!-- Meta de días trabajados al mes: solo visible en categoría Earnings, una meta por mes -->
     <div class="form-field" id="dias-trabajo-block" style="display:none">
       <span class="form-label">Meta de días trabajados al mes</span>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <input type="month" id="dias-trabajo-mes" class="form-input" style="max-width:160px">
         <input type="number" id="dias-trabajo-input" min="1" max="31" step="1"
                class="form-input" style="max-width:100px" placeholder="20">
         <button type="button" class="btn-cancel" style="padding:9px 16px" onclick="guardarDiasTrabajo()">Guardar</button>
@@ -225,29 +226,44 @@
       block.style.display = '';
       if (!diasTrabajoLoaded) {
         diasTrabajoLoaded = true;
-        fetch('/api/earnings/config')
-          .then(r => r.json())
-          .then(d => { document.getElementById('dias-trabajo-input').value = d.dias_trabajo_mes; })
-          .catch(() => {});
+        document.getElementById('dias-trabajo-mes').value = localYearMonthStr(new Date());
+        loadDiasTrabajoParaMes();
       }
     } else {
       block.style.display = 'none';
     }
   }
 
+  function loadDiasTrabajoParaMes() {
+    const val = document.getElementById('dias-trabajo-mes').value;
+    if (!val) return;
+    const [y, m] = val.split('-').map(Number);
+    fetch(`/api/earnings/config?year=${y}&month=${m}`)
+      .then(r => r.json())
+      .then(d => { document.getElementById('dias-trabajo-input').value = d.dias_trabajo_mes; })
+      .catch(() => {});
+  }
+
   function guardarDiasTrabajo() {
+    const mesVal = document.getElementById('dias-trabajo-mes').value;
     const input = document.getElementById('dias-trabajo-input');
     const feedback = document.getElementById('dias-trabajo-feedback');
     const n = parseInt(input.value, 10);
+    if (!mesVal) {
+      feedback.textContent = 'Selecciona el mes.';
+      feedback.style.color = '#f87171';
+      return;
+    }
     if (!n || n < 1 || n > 31) {
       feedback.textContent = 'Ingresa un número entre 1 y 31.';
       feedback.style.color = '#f87171';
       return;
     }
+    const [y, m] = mesVal.split('-').map(Number);
     fetch('/api/earnings/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dias_trabajo_mes: n }),
+      body: JSON.stringify({ year: y, month: m, dias_trabajo_mes: n }),
     })
       .then(async r => {
         const data = await r.json();
@@ -466,6 +482,8 @@
   document.querySelectorAll('input[name="tipo"], input[name="categoria"]').forEach(el =>
     el.addEventListener('change', updateVisibility)
   );
+
+  document.getElementById('dias-trabajo-mes').addEventListener('change', loadDiasTrabajoParaMes);
 
   fetchRate().then(updateVisibility);
 </script>

@@ -580,6 +580,12 @@
     return `${y}-${m}-${day}`;
   }
 
+  function localYearMonthStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+
   /* ─── Filter bar helpers ─── */
   function getDefaultDates() {
     const now = new Date();
