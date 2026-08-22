@@ -93,6 +93,17 @@
       </div>
     </div>
 
+    <!-- Meta de días trabajados al mes: solo visible en categoría Earnings -->
+    <div class="form-field" id="dias-trabajo-block" style="display:none">
+      <span class="form-label">Meta de días trabajados al mes</span>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <input type="number" id="dias-trabajo-input" min="1" max="31" step="1"
+               class="form-input" style="max-width:100px" placeholder="20">
+        <button type="button" class="btn-cancel" style="padding:9px 16px" onclick="guardarDiasTrabajo()">Guardar</button>
+        <span id="dias-trabajo-feedback" style="font-size:12px"></span>
+      </div>
+    </div>
+
     <!-- Selector de activo: solo visible en Inversión + Gasto -->
     <div class="form-field" id="asset-block" style="display:none">
       <span class="form-label">Activo</span>
@@ -205,6 +216,52 @@
     }
   }
 
+  let diasTrabajoLoaded = false;
+
+  function updateDiasTrabajoVisibility() {
+    const cat = document.querySelector('input[name="categoria"]:checked')?.value;
+    const block = document.getElementById('dias-trabajo-block');
+    if (cat === 'Earnings') {
+      block.style.display = '';
+      if (!diasTrabajoLoaded) {
+        diasTrabajoLoaded = true;
+        fetch('/api/earnings/config')
+          .then(r => r.json())
+          .then(d => { document.getElementById('dias-trabajo-input').value = d.dias_trabajo_mes; })
+          .catch(() => {});
+      }
+    } else {
+      block.style.display = 'none';
+    }
+  }
+
+  function guardarDiasTrabajo() {
+    const input = document.getElementById('dias-trabajo-input');
+    const feedback = document.getElementById('dias-trabajo-feedback');
+    const n = parseInt(input.value, 10);
+    if (!n || n < 1 || n > 31) {
+      feedback.textContent = 'Ingresa un número entre 1 y 31.';
+      feedback.style.color = '#f87171';
+      return;
+    }
+    fetch('/api/earnings/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dias_trabajo_mes: n }),
+    })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Error al guardar');
+        feedback.textContent = 'Guardado ✓';
+        feedback.style.color = '#4ade80';
+        setTimeout(() => { feedback.textContent = ''; }, 2500);
+      })
+      .catch(e => {
+        feedback.textContent = e.message;
+        feedback.style.color = '#f87171';
+      });
+  }
+
   function updateDescripcionHint() {
     const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
     const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
@@ -222,6 +279,7 @@
   function updateVisibility() {
     updateTipoMetaVisibility();
     updateDescripcionHint();
+    updateDiasTrabajoVisibility();
 
     const meta = isMeta();
     const fechaLabel = document.getElementById('fecha-label');

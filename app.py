@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from functools import wraps
 from collections import defaultdict
 import os
+import calendar
 import requests as http_requests
 import time
 
@@ -54,6 +55,31 @@ class MetaIngreso(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=False)
     fecha_fin    = db.Column(db.Date, nullable=False)
     monto_diario = db.Column(db.Numeric(10, 2), nullable=False)
+
+
+class ConfigEarnings(db.Model):
+    __tablename__ = "config_earnings"
+    id                = db.Column(db.Integer, primary_key=True)
+    dias_trabajo_mes  = db.Column(db.Integer, nullable=False, default=20)
+
+
+def get_dias_trabajo_mes():
+    cfg = ConfigEarnings.query.first()
+    if not cfg:
+        cfg = ConfigEarnings(dias_trabajo_mes=20)
+        db.session.add(cfg)
+        db.session.commit()
+    return cfg.dias_trabajo_mes
+
+
+def set_dias_trabajo_mes(n):
+    cfg = ConfigEarnings.query.first()
+    if not cfg:
+        cfg = ConfigEarnings(dias_trabajo_mes=n)
+        db.session.add(cfg)
+    else:
+        cfg.dias_trabajo_mes = n
+    db.session.commit()
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -567,6 +593,66 @@ def api_earnings_meta_detail(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/earnings/config", methods=["GET", "POST"])
+@login_requerido
+def api_earnings_config():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            n = int(data["dias_trabajo_mes"])
+            if n <= 0 or n > 31:
+                return jsonify({"error": "Ingresa un número de días entre 1 y 31"}), 400
+            set_dias_trabajo_mes(n)
+            return jsonify({"ok": True, "dias_trabajo_mes": n})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    return jsonify({"dias_trabajo_mes": get_dias_trabajo_mes()})
+
+
+MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+
+@app.route("/api/earnings/calendario")
+@login_requerido
+def api_earnings_calendario():
+    hoy = hoy_local()
+    try:
+        year  = int(request.args.get("year", hoy.year))
+        month = int(request.args.get("month", hoy.month))
+        if not (1 <= month <= 12):
+            raise ValueError
+    except (TypeError, ValueError):
+        year, month = hoy.year, hoy.month
+
+    primer_dia = date_type(year, month, 1)
+    dias_en_mes = calendar.monthrange(year, month)[1]
+    ultimo_dia = date_type(year, month, dias_en_mes)
+    # Python: Lunes=0..Domingo=6 → convertir a Domingo=0..Sábado=6 (como el calendario nativo)
+    primer_dia_semana = (calendar.monthrange(year, month)[0] + 1) % 7
+
+    movs = Movimiento.query.filter(
+        Movimiento.categoria == "Earnings",
+        Movimiento.tipo == "Ingreso",
+        Movimiento.fecha >= primer_dia,
+        Movimiento.fecha <= ultimo_dia,
+    ).all()
+    dias_con_ingreso = sorted({m.fecha.day for m in movs})
+
+    return jsonify({
+        "year": year,
+        "month": month,
+        "mes_label": f"{MESES_ES[month]} de {year}",
+        "dias_en_mes": dias_en_mes,
+        "primer_dia_semana": primer_dia_semana,
+        "dias_con_ingreso": dias_con_ingreso,
+        "dias_trabajados": len(dias_con_ingreso),
+        "meta_dias_mes": get_dias_trabajo_mes(),
+    })
 
 
 @app.route("/inversiones")
