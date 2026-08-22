@@ -47,6 +47,15 @@ class Movimiento(db.Model):
     importe              = db.Column(db.Numeric(10, 2), nullable=False)
     investment_asset_type = db.Column(db.String(50),  nullable=True)
     investment_asset_name = db.Column(db.String(100), nullable=True)
+    pagado_con_tarjeta   = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class PagoTarjeta(db.Model):
+    __tablename__ = "pagos_tarjeta"
+    id     = db.Column(db.Integer, primary_key=True)
+    fecha  = db.Column(db.Date, nullable=False)
+    monto  = db.Column(db.Numeric(10, 2), nullable=False)
+    nota   = db.Column(db.String(255), nullable=True)
 
 
 class MetaIngreso(db.Model):
@@ -178,6 +187,37 @@ def ranking_por_descripcion(movs):
     return sorted(ranking, key=lambda x: -x["total"])
 
 
+# ── ciclos de tarjeta de crédito ────────────────────────────────────────
+# Corte el día 20: un ciclo agrupa consumos del 25 de un mes al 20 del
+# siguiente, con vencimiento de pago el 20 del mes subsiguiente
+# (ej. consumos del 25-jul al 20-ago vencen el 20-sep).
+
+def _add_months(year, month, delta):
+    total = (year * 12 + (month - 1)) + delta
+    return total // 12, total % 12 + 1
+
+
+def ciclo_de_fecha(fecha):
+    """Devuelve (year, month) del día 25 en que abre el ciclo al que pertenece `fecha`."""
+    if fecha.day >= 21:
+        return fecha.year, fecha.month
+    y, m = _add_months(fecha.year, fecha.month, -1)
+    return y, m
+
+
+def ciclo_bounds(year, month):
+    inicio = date_type(year, month, 25)
+    cy, cm = _add_months(year, month, 1)
+    cierre = date_type(cy, cm, 20)
+    dy, dm = _add_months(year, month, 2)
+    vencimiento = date_type(dy, dm, 20)
+    return inicio, cierre, vencimiento
+
+
+def ciclo_id(year, month):
+    return f"{year:04d}-{month:02d}"
+
+
 # ── page routes ───────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET", "POST"])
@@ -240,6 +280,12 @@ def dashboard_earnings():
     return render_template("earnings.html", active_tab="earnings")
 
 
+@app.route("/dashboard/tarjeta")
+@login_requerido
+def dashboard_tarjeta():
+    return render_template("tarjeta.html", active_tab="tarjeta")
+
+
 @app.route("/nuevo", methods=["GET", "POST"])
 @login_requerido
 def nuevo():
@@ -260,6 +306,19 @@ def nuevo():
             except Exception as e:
                 db.session.rollback()
                 return f"Error al guardar: {str(e)}"
+        if request.form.get("tipo") == "Pago tarjeta":
+            try:
+                fecha = datetime.strptime(request.form["fecha"], "%Y-%m-%d").date()
+                monto = float(request.form["importe"])
+                if monto <= 0:
+                    return "Error al guardar: el monto del pago debe ser mayor a 0"
+                pago = PagoTarjeta(fecha=fecha, monto=monto, nota=request.form.get("descripcion") or None)
+                db.session.add(pago)
+                db.session.commit()
+                return redirect(url_for("dashboard_tarjeta"))
+            except Exception as e:
+                db.session.rollback()
+                return f"Error al guardar: {str(e)}"
         try:
             m = Movimiento(
                 fecha=datetime.strptime(request.form["fecha"], "%Y-%m-%d").date(),
@@ -269,6 +328,7 @@ def nuevo():
                 importe=float(request.form["importe"]),
                 investment_asset_type=request.form.get("investment_asset_type") or None,
                 investment_asset_name=request.form.get("investment_asset_name") or None,
+                pagado_con_tarjeta=bool(request.form.get("pagado_con_tarjeta")),
             )
             db.session.add(m)
             db.session.commit()
@@ -304,8 +364,16 @@ def eliminar_movimiento(id):
 def crear_tabla():
     try:
         db.create_all()
+        # db.create_all() solo crea tablas nuevas — "movimientos" ya existe con
+        # datos, así que la columna nueva se agrega aparte (idempotente).
+        db.session.execute(db.text(
+            "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS pagado_con_tarjeta "
+            "BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
+        db.session.commit()
         return "Tabla creada correctamente"
     except Exception as e:
+        db.session.rollback()
         return f"Error: {str(e)}"
 
 
@@ -669,6 +737,91 @@ def api_earnings_calendario():
         "dias_trabajados": len(dias_con_ingreso),
         "meta_dias_mes": get_dias_meta_mes(year, month),
     })
+
+
+@app.route("/api/tarjeta")
+@login_requerido
+def api_tarjeta():
+    hoy = hoy_local()
+    cargos_movs = Movimiento.query.filter(
+        Movimiento.tipo == "Gasto",
+        Movimiento.pagado_con_tarjeta.is_(True),
+    ).all()
+    pagos = PagoTarjeta.query.order_by(PagoTarjeta.fecha).all()
+
+    cargos_por_ciclo = defaultdict(float)
+    for m in cargos_movs:
+        cargos_por_ciclo[ciclo_de_fecha(m.fecha)] += float(m.importe)
+
+    ciclo_actual_cid = ciclo_de_fecha(hoy)
+    cids = set(cargos_por_ciclo.keys())
+    cids.add(ciclo_actual_cid)
+
+    ciclos = []
+    for cid in sorted(cids):
+        inicio, cierre, vencimiento = ciclo_bounds(*cid)
+        total_cargos = round(cargos_por_ciclo.get(cid, 0.0), 2)
+        ciclos.append({
+            "cid": cid, "id": ciclo_id(*cid),
+            "inicio": inicio, "cierre": cierre, "vencimiento": vencimiento,
+            "total_cargos": total_cargos, "total_pagado": 0.0, "saldo": total_cargos,
+        })
+
+    # FIFO: cada pago se aplica al ciclo pendiente más antiguo primero.
+    for pago in pagos:
+        restante = float(pago.monto)
+        for c in ciclos:
+            if restante <= 0:
+                break
+            if c["saldo"] > 0:
+                aplicado = min(restante, c["saldo"])
+                c["saldo"] = round(c["saldo"] - aplicado, 2)
+                c["total_pagado"] = round(c["total_pagado"] + aplicado, 2)
+                restante -= aplicado
+
+    for c in ciclos:
+        if c["saldo"] <= 0.001:
+            c["estado"] = "pagado"
+        elif c["vencimiento"] < hoy:
+            c["estado"] = "vencido"
+        else:
+            c["estado"] = "pendiente"
+        c["inicio"]      = c["inicio"].strftime("%Y-%m-%d")
+        c["cierre"]      = c["cierre"].strftime("%Y-%m-%d")
+        c["vencimiento"] = c["vencimiento"].strftime("%Y-%m-%d")
+
+    ciclo_actual = next((c for c in ciclos if c["cid"] == ciclo_actual_cid), None)
+    for c in ciclos:
+        del c["cid"]
+    ciclos.sort(key=lambda c: c["inicio"], reverse=True)
+
+    pendientes = [c for c in ciclos if c["saldo"] > 0.001]
+    proximo = min(pendientes, key=lambda c: c["vencimiento"]) if pendientes else None
+
+    return jsonify({
+        "kpis": {
+            "deuda_total": round(sum(c["saldo"] for c in ciclos), 2),
+            "proximo_vencimiento": proximo["vencimiento"] if proximo else None,
+            "monto_proximo_vencimiento": proximo["saldo"] if proximo else 0,
+            "ciclo_actual_total": ciclo_actual["total_cargos"] if ciclo_actual else 0,
+        },
+        "ciclos": ciclos,
+        "pagos": [{
+            "id": p.id,
+            "fecha": p.fecha.strftime("%Y-%m-%d"),
+            "monto": float(p.monto),
+            "nota": p.nota,
+        } for p in reversed(pagos)],
+    })
+
+
+@app.route("/api/tarjeta/pagos/<int:id>", methods=["DELETE"])
+@login_requerido
+def api_tarjeta_pago_delete(id):
+    p = PagoTarjeta.query.get_or_404(id)
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/inversiones")

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Tarjeta — App Finanzas{% endblock %}
+
+{% block content %}
+<style>
+  .badge-ciclo {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
+    border-radius: 99px; font-size: 11px; font-weight: 600;
+  }
+  .badge-pagado    { background: rgba(34,197,94,0.12);  color: #4ade80; }
+  .badge-pendiente { background: rgba(124,58,237,0.14); color: #a78bfa; }
+  .badge-vencido   { background: rgba(239,68,68,0.14);  color: #f87171; }
+  .venc-hoy { color: #f87171; font-weight: 700; }
+</style>
+
+<div class="page-hdr">
+  <h1 class="page-title">Tarjeta de crédito</h1>
+  <p class="page-sub">Consumos pagados con tarjeta, agrupados por ciclo de facturación (25 al 20 de cada mes, con vencimiento el 20 del mes siguiente al cierre).</p>
+</div>
+
+<div class="kpi-grid">
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(124,58,237,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 6h16.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-9a1.5 1.5 0 011.5-1.5z"/></svg>
+    </div>
+    <div class="kpi-label">Deuda total</div>
+    <div class="kpi-value" style="color:#a78bfa" id="kpi-deuda">S/ —</div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(248,113,113,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-8.25 3h.008v.008h-.008V15z"/></svg>
+    </div>
+    <div class="kpi-label">Próximo vencimiento</div>
+    <div class="kpi-value" style="color:#f87171;font-size:18px" id="kpi-vencimiento">—</div>
+    <div class="kpi-delta" id="kpi-vencimiento-monto"></div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(167,139,250,0.12)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+    </div>
+    <div class="kpi-label">Consumido en el ciclo actual</div>
+    <div class="kpi-value" style="color:#c4b5fd" id="kpi-ciclo-actual">S/ —</div>
+  </div>
+</div>
+
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+  <h2 style="font-size:15px;font-weight:700;color:var(--text)">Ciclos de facturación</h2>
+  <a href="/nuevo" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">+ Registrar pago →</a>
+</div>
+
+<div class="tbl-card" style="margin-bottom:28px">
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Ciclo</th>
+          <th style="text-align:right">Consumido</th>
+          <th style="text-align:right">Pagado</th>
+          <th style="text-align:right">Saldo</th>
+          <th>Vence</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="ciclos-body"></tbody>
+    </table>
+    <div class="empty-state" id="ciclos-empty" style="display:none">
+      <p style="font-size:13px;margin-bottom:8px">Aún no tienes consumos marcados como "pagados con tarjeta".</p>
+      <a href="/nuevo" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">Registrar el primero →</a>
+    </div>
+  </div>
+</div>
+
+<h2 style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Pagos registrados</h2>
+
+<div class="tbl-card">
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th style="text-align:right">Monto</th>
+          <th>Nota</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="pagos-body"></tbody>
+    </table>
+    <div class="empty-state" id="pagos-empty" style="display:none">
+      <p style="font-size:13px;margin-bottom:8px">Aún no has registrado ningún pago de tarjeta.</p>
+      <a href="/nuevo" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">Registrar el primero →</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmtMoney(v) {
+  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtFecha(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+const ESTADO_LABEL = { pagado: 'Pagado', pendiente: 'Pendiente', vencido: 'Vencido' };
+
+function loadTarjeta() {
+  fetch('/api/tarjeta')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('kpi-deuda').textContent = fmtMoney(data.kpis.deuda_total);
+
+      const kv = document.getElementById('kpi-vencimiento');
+      const kvm = document.getElementById('kpi-vencimiento-monto');
+      if (data.kpis.proximo_vencimiento) {
+        kv.textContent = fmtFecha(data.kpis.proximo_vencimiento);
+        kvm.textContent = fmtMoney(data.kpis.monto_proximo_vencimiento);
+      } else {
+        kv.textContent = 'Sin pendientes';
+        kvm.textContent = '';
+      }
+
+      document.getElementById('kpi-ciclo-actual').textContent = fmtMoney(data.kpis.ciclo_actual_total);
+
+      const ciclosBody = document.getElementById('ciclos-body');
+      const ciclosEmpty = document.getElementById('ciclos-empty');
+      ciclosBody.innerHTML = '';
+      if (!data.ciclos.length) {
+        ciclosEmpty.style.display = 'block';
+      } else {
+        ciclosEmpty.style.display = 'none';
+        data.ciclos.forEach(c => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="muted">${fmtFecha(c.inicio)} → ${fmtFecha(c.cierre)}</td>
+            <td class="right">${fmtMoney(c.total_cargos)}</td>
+            <td class="right" style="color:#4ade80">${fmtMoney(c.total_pagado)}</td>
+            <td class="right" style="font-weight:700;${c.saldo > 0 ? 'color:#a78bfa' : ''}">${fmtMoney(c.saldo)}</td>
+            <td class="muted">${fmtFecha(c.vencimiento)}</td>
+            <td><span class="badge-ciclo badge-${c.estado}">${ESTADO_LABEL[c.estado]}</span></td>`;
+          ciclosBody.appendChild(tr);
+        });
+      }
+
+      const pagosBody = document.getElementById('pagos-body');
+      const pagosEmpty = document.getElementById('pagos-empty');
+      pagosBody.innerHTML = '';
+      if (!data.pagos.length) {
+        pagosEmpty.style.display = 'block';
+      } else {
+        pagosEmpty.style.display = 'none';
+        data.pagos.forEach(p => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="muted">${fmtFecha(p.fecha)}</td>
+            <td class="right" style="font-weight:700;color:#4ade80">${fmtMoney(p.monto)}</td>
+            <td class="muted">${p.nota || '—'}</td>
+            <td class="right">
+              <a href="#" onclick="eliminarPago(${p.id});return false" class="btn-del">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                </svg>
+                Eliminar
+              </a>
+            </td>`;
+          pagosBody.appendChild(tr);
+        });
+      }
+    });
+}
+
+function eliminarPago(id) {
+  if (!confirm('¿Seguro que deseas eliminar este pago?')) return;
+  fetch(`/api/tarjeta/pagos/${id}`, { method: 'DELETE' }).then(loadTarjeta);
+}
+
+window.addEventListener('DOMContentLoaded', loadTarjeta);
+</script>
+{% endblock %}
