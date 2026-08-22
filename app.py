@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from datetime import datetime, date as date_type, timedelta
+from zoneinfo import ZoneInfo
 from functools import wraps
 from collections import defaultdict
 import os
@@ -15,6 +16,15 @@ USUARIO_ADMIN = os.getenv("APP_USER")
 PASSWORD_ADMIN = os.getenv("APP_PASSWORD")
 
 db = SQLAlchemy(app)
+
+# El servidor (Render) corre en UTC — usar date.today() ahí hace que "hoy"
+# cambie ~7pm hora de Perú en vez de a medianoche local. Fijar la zona
+# horaria explícitamente para toda fecha derivada de "ahora".
+LOCAL_TZ = ZoneInfo("America/Lima")
+
+
+def hoy_local():
+    return datetime.now(LOCAL_TZ).date()
 
 
 def login_requerido(f):
@@ -56,7 +66,7 @@ def parse_dates(req):
             return fallback
     return (
         _p(req.args.get("desde", ""), date_type(2000, 1, 1)),
-        _p(req.args.get("hasta", ""), date_type.today()),
+        _p(req.args.get("hasta", ""), hoy_local()),
     )
 
 
@@ -476,7 +486,7 @@ def api_earnings():
         meta_linea.append({"x": to_epoch_day(seg_fin), "y": monto})
         prev_fin = seg_fin
 
-    hoy = date_type.today()
+    hoy = hoy_local()
     meta_hoy_activa = None
     for m in todas_metas:
         if m.fecha_inicio <= hoy <= m.fecha_fin:

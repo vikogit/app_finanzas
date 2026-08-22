@@ -569,23 +569,34 @@
 
   window._charts = [];
 
+  /* ─── Local-date helpers ───
+     Never use Date#toISOString() for "today"/"hasta" — it converts to UTC,
+     which rolls the date over hours early for any UTC-negative timezone
+     (e.g. Perú, UTC-5, sees tomorrow's date starting at 7pm local time). */
+  function localDateStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   /* ─── Filter bar helpers ─── */
   function getDefaultDates() {
     const now = new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     return {
-      desde: first.toISOString().split('T')[0],
-      hasta: now.toISOString().split('T')[0],
+      desde: localDateStr(first),
+      hasta: localDateStr(now),
     };
   }
 
   function setQuickFilter(type) {
     const now = new Date();
     let desde;
-    const hasta = now.toISOString().split('T')[0];
-    if (type === 'mes')  desde = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    if (type === '3m')   desde = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().split('T')[0];
-    if (type === 'año')  desde = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+    const hasta = localDateStr(now);
+    if (type === 'mes')  desde = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+    if (type === '3m')   desde = localDateStr(new Date(now.getFullYear(), now.getMonth() - 3, 1));
+    if (type === 'año')  desde = localDateStr(new Date(now.getFullYear(), 0, 1));
     if (type === 'todo') desde = '2000-01-01';
     document.getElementById('desde').value = desde;
     document.getElementById('hasta').value = hasta;

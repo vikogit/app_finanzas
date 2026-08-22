@@ -365,7 +365,7 @@ function openMetaModal(meta) {
   } else {
     document.getElementById('meta-modal-title').textContent = 'Nueva meta';
     document.getElementById('meta-id').value = '';
-    document.getElementById('meta-desde').value = new Date().toISOString().split('T')[0];
+    document.getElementById('meta-desde').value = localDateStr(new Date());
     document.getElementById('meta-hasta').value = '';
     document.getElementById('meta-monto').value = '';
   }
