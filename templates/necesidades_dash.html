@@ -138,7 +138,10 @@ function renderTendencia(tendencia) {
 
 function loadData(desde, hasta) {
   fetch(`/api/necesidades?desde=${desde}&hasta=${hasta}`)
-    .then(r => r.json())
+    .then(async r => {
+      if (!r.ok) throw new Error(`Error del servidor (${r.status}): ${await r.text()}`);
+      return r.json();
+    })
     .then(data => {
       const kpiSaldo = document.getElementById('kpi-saldo');
       kpiSaldo.textContent = fmtMoney(data.kpis.saldo_disponible);
@@ -156,6 +159,10 @@ function loadData(desde, hasta) {
       chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
 
       window._charts.push(chartTendencia, chartDonut);
+    })
+    .catch(e => {
+      console.error(e);
+      document.getElementById('kpi-saldo').textContent = 'Error';
     });
 }
 
