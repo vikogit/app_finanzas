@@ -26,8 +26,8 @@
     <div class="kpi-icon" style="background:rgba(99,102,241,0.15)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
     </div>
-    <div class="kpi-label">Total del período</div>
-    <div class="kpi-value" style="color:#818cf8" id="kpi-total">S/ —</div>
+    <div class="kpi-label">Saldo disponible</div>
+    <div class="kpi-value" style="color:#818cf8" id="kpi-saldo">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(99,102,241,0.1)">
@@ -76,9 +76,11 @@ function loadData(desde, hasta) {
     .then(r => r.json())
     .then(data => {
       const fmt = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-      document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
-      document.getElementById('kpi-prom').textContent  = fmt(data.kpis.promedio_mensual);
-      document.getElementById('kpi-txn').textContent   = data.kpis.num_transacciones;
+      const kpiSaldo = document.getElementById('kpi-saldo');
+      kpiSaldo.textContent = fmt(data.kpis.saldo_disponible);
+      kpiSaldo.style.color = data.kpis.saldo_disponible >= 0 ? '#818cf8' : '#f87171';
+      document.getElementById('kpi-prom').textContent = fmt(data.kpis.promedio_mensual);
+      document.getElementById('kpi-txn').textContent  = data.kpis.num_transacciones;
 
       if (chartArea)  { chartArea.destroy();  window._charts = window._charts.filter(c=>c!==chartArea);  }
       if (chartDonut) { chartDonut.destroy(); window._charts = window._charts.filter(c=>c!==chartDonut); }
@@ -94,11 +96,11 @@ function loadData(desde, hasta) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const d = getDefaultDates();
-  document.getElementById('desde').value = d.desde;
-  document.getElementById('hasta').value = d.hasta;
-  document.querySelector('[data-qf="mes"]').classList.add('active');
-  loadData(d.desde, d.hasta);
+  const desde = '2025-07-01';
+  const hasta = localDateStr(new Date());
+  document.getElementById('desde').value = desde;
+  document.getElementById('hasta').value = hasta;
+  loadData(desde, hasta);
 });
 </script>
 {% endblock %}

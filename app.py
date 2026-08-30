@@ -495,11 +495,20 @@ def api_necesidades():
     total = sum(float(m.importe) for m in movs)
     por_mes = agrupar_mensual(movs, desde, hasta)
     meses = len(por_mes)
+
+    # Saldo disponible: todo el historial de Necesidades, sin importar el filtro de período.
+    movs_todos = Movimiento.query.filter(Movimiento.categoria == "Necesidades").all()
+    saldo_disponible = round(
+        sum(float(m.importe) for m in movs_todos if m.tipo == "Ingreso") -
+        sum(float(m.importe) for m in movs_todos if m.tipo == "Gasto"), 2
+    )
+
     return jsonify({
         "kpis": {
             "total_periodo": round(total, 2),
             "promedio_mensual": round(total / meses, 2) if meses else 0,
             "num_transacciones": len(movs),
+            "saldo_disponible": saldo_disponible,
         },
         "top_items": top_items(movs),
         "tendencia_mensual": [{"mes": i["mes"], "total": round(i["gastos"], 2)} for i in por_mes],
