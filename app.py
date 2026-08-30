@@ -342,8 +342,12 @@ def nuevo():
 @app.route("/movimientos")
 @login_requerido
 def ver_movimientos():
-    desde_raw = request.args.get("desde", "")
-    hasta_raw = request.args.get("hasta", "")
+    desde_raw       = request.args.get("desde", "")
+    hasta_raw       = request.args.get("hasta", "")
+    tipo_raw        = request.args.get("tipo", "")
+    categoria_raw   = request.args.get("categoria", "")
+    descripcion_raw = request.args.get("descripcion", "")
+
     q = Movimiento.query
     try:
         if desde_raw:
@@ -355,8 +359,19 @@ def ver_movimientos():
             q = q.filter(Movimiento.fecha <= datetime.strptime(hasta_raw, "%Y-%m-%d").date())
     except ValueError:
         hasta_raw = ""
+    if tipo_raw:
+        q = q.filter(Movimiento.tipo == tipo_raw)
+    if categoria_raw:
+        q = q.filter(Movimiento.categoria == categoria_raw)
+    if descripcion_raw:
+        q = q.filter(Movimiento.descripcion.ilike(f"%{descripcion_raw}%"))
+
     movimientos = q.order_by(Movimiento.id.desc()).all()
-    return render_template("movimientos.html", movimientos=movimientos, desde=desde_raw, hasta=hasta_raw)
+    return render_template(
+        "movimientos.html", movimientos=movimientos,
+        desde=desde_raw, hasta=hasta_raw,
+        tipo=tipo_raw, categoria=categoria_raw, descripcion=descripcion_raw,
+    )
 
 
 @app.route("/eliminar/<int:id>")

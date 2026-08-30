@@ -2,17 +2,42 @@
 {% block title %}Movimientos — App Finanzas{% endblock %}
 
 {% block content %}
+<style>
+  .th-filter { position: relative; }
+  .th-filter .th-label {
+    cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 7px; border-radius: 6px; transition: background .12s, color .12s;
+  }
+  .th-filter .th-label:hover { background: var(--bg-card); color: var(--text); }
+  .th-filter.active .th-label { background: rgba(249,115,22,0.18); color: #fb923c; }
+  .th-filter .caret { font-size: 8px; opacity: .6; }
+  .col-filter-dropdown {
+    position: absolute; top: 100%; left: 0; margin-top: 6px; z-index: 60;
+    min-width: 160px; background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 5px; box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+  }
+  html:not(.dark) .col-filter-dropdown { background: #ffffff; }
+  .col-filter-opt {
+    padding: 7px 10px; font-size: 12px; font-weight: 500; color: var(--text);
+    cursor: pointer; border-radius: 7px; white-space: nowrap;
+  }
+  .col-filter-opt:hover { background: var(--bg-card); }
+  .col-filter-dropdown .form-input { font-size: 12px; padding: 7px 10px; }
+</style>
+
 <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
   <div>
     <h1 class="page-title">Movimientos</h1>
     <p class="page-sub">Historial completo de ingresos y gastos</p>
   </div>
-  <a href="/nuevo" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;color:white;text-decoration:none;background:linear-gradient(135deg,#f97316,#dc2626);white-space:nowrap;transition:opacity 0.15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+  {% if desde or hasta or tipo or categoria or descripcion %}
+  <a href="/movimientos" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;color:var(--text-muted);text-decoration:none;background:var(--bg-card2);border:1px solid var(--border);white-space:nowrap;transition:color .15s,background .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
     </svg>
-    Nuevo
+    Limpiar filtros
   </a>
+  {% endif %}
 </div>
 
 <form method="GET" class="filter-bar">
@@ -20,10 +45,10 @@
   <input type="date" name="desde" class="date-input" value="{{ desde }}">
   <span class="filter-sep">→</span>
   <input type="date" name="hasta" class="date-input" value="{{ hasta }}">
+  <input type="hidden" name="tipo" value="{{ tipo }}">
+  <input type="hidden" name="categoria" value="{{ categoria }}">
+  <input type="hidden" name="descripcion" value="{{ descripcion }}">
   <button type="submit" class="filter-btn">Aplicar</button>
-  {% if desde or hasta %}
-  <a href="/movimientos" style="font-size:12px;font-weight:500;color:var(--text-muted);text-decoration:none;margin-left:auto">Limpiar filtro</a>
-  {% endif %}
 </form>
 
 <div class="tbl-card">
@@ -32,9 +57,28 @@
       <thead>
         <tr>
           <th>Fecha</th>
-          <th>Tipo</th>
-          <th>Categoría</th>
-          <th>Descripción</th>
+          <th class="th-filter {{ 'active' if tipo }}">
+            <span class="th-label" onclick="toggleColFilter('tipo', event)" ondblclick="clearColFilter('tipo', event)">Tipo <span class="caret">▾</span></span>
+            <div class="col-filter-dropdown" id="dropdown-tipo" style="display:none" onclick="event.stopPropagation()">
+              <div class="col-filter-opt" onclick="setColFilter('tipo','Gasto')">Gasto</div>
+              <div class="col-filter-opt" onclick="setColFilter('tipo','Ingreso')">Ingreso</div>
+            </div>
+          </th>
+          <th class="th-filter {{ 'active' if categoria }}">
+            <span class="th-label" onclick="toggleColFilter('categoria', event)" ondblclick="clearColFilter('categoria', event)">Categoría <span class="caret">▾</span></span>
+            <div class="col-filter-dropdown" id="dropdown-categoria" style="display:none" onclick="event.stopPropagation()">
+              {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings'] %}
+              <div class="col-filter-opt" onclick="setColFilter('categoria','{{ cat }}')">{{ cat }}</div>
+              {% endfor %}
+            </div>
+          </th>
+          <th class="th-filter {{ 'active' if descripcion }}">
+            <span class="th-label" onclick="toggleColFilter('descripcion', event)" ondblclick="clearColFilter('descripcion', event)">Descripción <span class="caret">▾</span></span>
+            <div class="col-filter-dropdown" id="dropdown-descripcion" style="display:none" onclick="event.stopPropagation()">
+              <input type="text" class="form-input" placeholder="Buscar..." value="{{ descripcion }}"
+                     onkeydown="if(event.key==='Enter'){setColFilter('descripcion', this.value)}">
+            </div>
+          </th>
           <th style="text-align:right">Importe</th>
           <th></th>
         </tr>
@@ -97,4 +141,38 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleColFilter(col, ev) {
+  ev.stopPropagation();
+  document.querySelectorAll('.col-filter-dropdown').forEach(d => {
+    if (d.id !== `dropdown-${col}`) d.style.display = 'none';
+  });
+  const dd = document.getElementById(`dropdown-${col}`);
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  if (dd.style.display === 'block') {
+    const input = dd.querySelector('input');
+    if (input) input.focus();
+  }
+}
+
+function clearColFilter(col, ev) {
+  ev.stopPropagation();
+  const url = new URL(window.location.href);
+  url.searchParams.delete(col);
+  window.location.href = url.toString();
+}
+
+function setColFilter(col, value) {
+  const url = new URL(window.location.href);
+  url.searchParams.set(col, value);
+  window.location.href = url.toString();
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.col-filter-dropdown').forEach(d => d.style.display = 'none');
+});
+</script>
 {% endblock %}
