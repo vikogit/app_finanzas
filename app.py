@@ -617,6 +617,67 @@ def api_necesidades_config():
     return jsonify({"year": year, "month": month, "monto_meta": get_meta_necesidades_mes(year, month)})
 
 
+@app.route("/api/necesidades/metas", methods=["GET", "POST"])
+@login_requerido
+def api_necesidades_metas():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            year  = int(data["year"])
+            month = int(data["month"])
+            monto = float(data["monto_meta"])
+            if not (1 <= month <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
+            if monto <= 0:
+                return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+            existing = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
+            if existing:
+                return jsonify({"error": "Ya existe una meta para ese mes — edítala en vez de crear otra"}), 400
+            set_meta_necesidades_mes(year, month, monto)
+            row = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
+            return jsonify({"id": row.id}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    metas = MetaNecesidadesMes.query.order_by(MetaNecesidadesMes.year.desc(), MetaNecesidadesMes.month.desc()).all()
+    return jsonify([{
+        "id": m.id, "year": m.year, "month": m.month,
+        "mes_label": f"{MESES_ES[m.month]} {m.year}",
+        "monto_meta": float(m.monto_meta),
+    } for m in metas])
+
+
+@app.route("/api/necesidades/metas/<int:id>", methods=["PUT", "DELETE"])
+@login_requerido
+def api_necesidades_meta_detail(id):
+    m = MetaNecesidadesMes.query.get_or_404(id)
+
+    if request.method == "DELETE":
+        db.session.delete(m)
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        year  = int(data["year"])
+        month = int(data["month"])
+        monto = float(data["monto_meta"])
+        if not (1 <= month <= 12):
+            return jsonify({"error": "Mes inválido"}), 400
+        if monto <= 0:
+            return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+        existing = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
+        if existing and existing.id != m.id:
+            return jsonify({"error": "Ya existe una meta para ese mes"}), 400
+        m.year, m.month, m.monto_meta = year, month, monto
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route("/api/diversion")
 @login_requerido
 def api_diversion():
@@ -701,6 +762,67 @@ def api_diversion_config():
         year, month = hoy.year, hoy.month
 
     return jsonify({"year": year, "month": month, "monto_meta": get_meta_diversion_mes(year, month)})
+
+
+@app.route("/api/diversion/metas", methods=["GET", "POST"])
+@login_requerido
+def api_diversion_metas():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            year  = int(data["year"])
+            month = int(data["month"])
+            monto = float(data["monto_meta"])
+            if not (1 <= month <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
+            if monto <= 0:
+                return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+            existing = MetaDiversionMes.query.filter_by(year=year, month=month).first()
+            if existing:
+                return jsonify({"error": "Ya existe una meta para ese mes — edítala en vez de crear otra"}), 400
+            set_meta_diversion_mes(year, month, monto)
+            row = MetaDiversionMes.query.filter_by(year=year, month=month).first()
+            return jsonify({"id": row.id}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    metas = MetaDiversionMes.query.order_by(MetaDiversionMes.year.desc(), MetaDiversionMes.month.desc()).all()
+    return jsonify([{
+        "id": m.id, "year": m.year, "month": m.month,
+        "mes_label": f"{MESES_ES[m.month]} {m.year}",
+        "monto_meta": float(m.monto_meta),
+    } for m in metas])
+
+
+@app.route("/api/diversion/metas/<int:id>", methods=["PUT", "DELETE"])
+@login_requerido
+def api_diversion_meta_detail(id):
+    m = MetaDiversionMes.query.get_or_404(id)
+
+    if request.method == "DELETE":
+        db.session.delete(m)
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        year  = int(data["year"])
+        month = int(data["month"])
+        monto = float(data["monto_meta"])
+        if not (1 <= month <= 12):
+            return jsonify({"error": "Mes inválido"}), 400
+        if monto <= 0:
+            return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+        existing = MetaDiversionMes.query.filter_by(year=year, month=month).first()
+        if existing and existing.id != m.id:
+            return jsonify({"error": "Ya existe una meta para ese mes"}), 400
+        m.year, m.month, m.monto_meta = year, month, monto
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/inversion")
