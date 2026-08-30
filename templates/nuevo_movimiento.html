@@ -94,6 +94,10 @@
           <input type="radio" id="tarjeta" name="categoria" value="Tarjeta">
           <label for="tarjeta">Tarjeta</label>
         </div>
+        <div class="pill-radio">
+          <input type="radio" id="rd" name="categoria" value="R&D">
+          <label for="rd">R &amp; D</label>
+        </div>
       </div>
     </div>
 
@@ -235,8 +239,14 @@
   // Necesidades solo admite dólares en Gasto; Tarjeta los admite tanto al
   // gastar (consumo en USD) como al pagar (repago en USD), ya que la
   // tarjeta permite ambas monedas en las dos direcciones.
+  function isRdIngreso() {
+    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+    const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
+    return tipo === 'Ingreso' && cat === 'R&D';
+  }
+
   function isUsdEligible() {
-    return isNecesidadesGasto() || isTarjetaCategoria();
+    return isNecesidadesGasto() || isTarjetaCategoria() || isRdIngreso();
   }
 
   function isUsdMode() {

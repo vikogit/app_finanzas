@@ -32,7 +32,7 @@
     <div class="form-field">
       <span class="form-label">Categoría</span>
       <div class="pill-group">
-        {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings', 'Tarjeta'] %}
+        {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings', 'Tarjeta', 'R&D'] %}
         <div class="pill-radio">
           <input type="radio" id="cat-{{ loop.index }}" name="categoria" value="{{ cat }}" {% if m.categoria == cat %}checked{% endif %}>
           <label for="cat-{{ loop.index }}">{{ cat }}</label>
