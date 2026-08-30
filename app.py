@@ -342,8 +342,21 @@ def nuevo():
 @app.route("/movimientos")
 @login_requerido
 def ver_movimientos():
-    movimientos = Movimiento.query.order_by(Movimiento.id.desc()).all()
-    return render_template("movimientos.html", movimientos=movimientos)
+    desde_raw = request.args.get("desde", "")
+    hasta_raw = request.args.get("hasta", "")
+    q = Movimiento.query
+    try:
+        if desde_raw:
+            q = q.filter(Movimiento.fecha >= datetime.strptime(desde_raw, "%Y-%m-%d").date())
+    except ValueError:
+        desde_raw = ""
+    try:
+        if hasta_raw:
+            q = q.filter(Movimiento.fecha <= datetime.strptime(hasta_raw, "%Y-%m-%d").date())
+    except ValueError:
+        hasta_raw = ""
+    movimientos = q.order_by(Movimiento.id.desc()).all()
+    return render_template("movimientos.html", movimientos=movimientos, desde=desde_raw, hasta=hasta_raw)
 
 
 @app.route("/eliminar/<int:id>")
@@ -357,6 +370,28 @@ def eliminar_movimiento(id):
         db.session.rollback()
         return f"Error al eliminar: {str(e)}"
     return redirect(url_for("ver_movimientos"))
+
+
+@app.route("/editar/<int:id>", methods=["GET", "POST"])
+@login_requerido
+def editar_movimiento(id):
+    m = Movimiento.query.get_or_404(id)
+    if request.method == "POST":
+        try:
+            m.fecha = datetime.strptime(request.form["fecha"], "%Y-%m-%d").date()
+            m.tipo = request.form["tipo"]
+            m.categoria = request.form["categoria"]
+            m.descripcion = request.form["descripcion"]
+            m.importe = float(request.form["importe"])
+            m.investment_asset_type = request.form.get("investment_asset_type") or None
+            m.investment_asset_name = request.form.get("investment_asset_name") or None
+            m.pagado_con_tarjeta = bool(request.form.get("pagado_con_tarjeta"))
+            db.session.commit()
+            return redirect(url_for("ver_movimientos"))
+        except Exception as e:
+            db.session.rollback()
+            return f"Error al guardar: {str(e)}"
+    return render_template("editar_movimiento.html", m=m)
 
 
 @app.route("/crear-tabla")

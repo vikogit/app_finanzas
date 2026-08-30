@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Editar movimiento — App Finanzas{% endblock %}
+
+{% block content %}
+<div class="page-hdr">
+  <h1 class="page-title">Editar movimiento</h1>
+  <p class="page-sub">Modifica los datos de este registro</p>
+</div>
+
+<div class="form-card">
+  <form method="POST" id="form-editar">
+
+    <div class="form-field">
+      <label for="fecha" class="form-label">Fecha</label>
+      <input type="date" id="fecha" name="fecha" required class="form-input" value="{{ m.fecha }}">
+    </div>
+
+    <div class="form-field">
+      <span class="form-label">Tipo</span>
+      <div class="pill-group">
+        <div class="pill-radio">
+          <input type="radio" id="gasto" name="tipo" value="Gasto" {% if m.tipo == 'Gasto' %}checked{% endif %}>
+          <label for="gasto">Gasto</label>
+        </div>
+        <div class="pill-radio">
+          <input type="radio" id="ingreso" name="tipo" value="Ingreso" {% if m.tipo == 'Ingreso' %}checked{% endif %}>
+          <label for="ingreso">Ingreso</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <span class="form-label">Categoría</span>
+      <div class="pill-group">
+        {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings'] %}
+        <div class="pill-radio">
+          <input type="radio" id="cat-{{ loop.index }}" name="categoria" value="{{ cat }}" {% if m.categoria == cat %}checked{% endif %}>
+          <label for="cat-{{ loop.index }}">{{ cat }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Pagado con tarjeta: solo visible en Gasto -->
+    <div class="form-field" id="tarjeta-check-block" style="{{ '' if m.tipo == 'Gasto' else 'display:none' }}">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text)">
+        <input type="checkbox" id="pagado_con_tarjeta" name="pagado_con_tarjeta" value="1"
+               {% if m.pagado_con_tarjeta %}checked{% endif %} style="width:16px;height:16px;accent-color:#7c3aed">
+        Pagué esto con tarjeta de crédito
+      </label>
+    </div>
+
+    <!-- Activo: solo visible en Inversión, edición directa (sin el asistente de 2 pasos) -->
+    <div class="form-field" id="asset-fields" style="{{ '' if m.categoria == 'Inversión' else 'display:none' }}">
+      <label for="investment_asset_type" class="form-label">Tipo de activo (opcional)</label>
+      <input type="text" id="investment_asset_type" name="investment_asset_type" class="form-input"
+             value="{{ m.investment_asset_type or '' }}" placeholder="Ej: ETFs, Cripto, Acciones...">
+      <label for="investment_asset_name" class="form-label" style="margin-top:12px;display:block">Nombre del activo (opcional)</label>
+      <input type="text" id="investment_asset_name" name="investment_asset_name" class="form-input"
+             value="{{ m.investment_asset_name or '' }}" placeholder="Ej: Bitcoin, S&amp;P 500...">
+    </div>
+
+    <div class="form-field">
+      <label for="descripcion" class="form-label">Descripción</label>
+      <input type="text" id="descripcion" name="descripcion" required
+        value="{{ m.descripcion }}" class="form-input">
+    </div>
+
+    <div class="form-field">
+      <label for="importe" class="form-label">Importe (S/)</label>
+      <div class="form-input-prefix">
+        <span class="form-prefix">S/</span>
+        <input type="number" id="importe" name="importe" step="0.01" min="0" required
+          value="{{ m.importe }}" class="form-input">
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-submit">Guardar cambios</button>
+      <a href="/movimientos" class="btn-cancel">Cancelar</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleTarjetaCheck() {
+    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+    document.getElementById('tarjeta-check-block').style.display = tipo === 'Gasto' ? '' : 'none';
+  }
+  function toggleAssetFields() {
+    const cat = document.querySelector('input[name="categoria"]:checked')?.value;
+    document.getElementById('asset-fields').style.display = cat === 'Inversión' ? '' : 'none';
+  }
+  document.querySelectorAll('input[name="tipo"]').forEach(el => el.addEventListener('change', toggleTarjetaCheck));
+  document.querySelectorAll('input[name="categoria"]').forEach(el => el.addEventListener('change', toggleAssetFields));
+</script>
+{% endblock %}
