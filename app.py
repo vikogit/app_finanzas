@@ -93,6 +93,30 @@ def set_dias_meta_mes(year, month, n):
     db.session.commit()
 
 
+class MetaNecesidadesMes(db.Model):
+    __tablename__ = "metas_necesidades_mes"
+    id         = db.Column(db.Integer, primary_key=True)
+    year       = db.Column(db.Integer, nullable=False)
+    month      = db.Column(db.Integer, nullable=False)
+    monto_meta = db.Column(db.Numeric(10, 2), nullable=False)
+    __table_args__ = (db.UniqueConstraint("year", "month", name="uq_metas_necesidades_mes_year_month"),)
+
+
+def get_meta_necesidades_mes(year, month):
+    row = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
+    return float(row.monto_meta) if row else None
+
+
+def set_meta_necesidades_mes(year, month, monto):
+    row = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
+    if row:
+        row.monto_meta = monto
+    else:
+        row = MetaNecesidadesMes(year=year, month=month, monto_meta=monto)
+        db.session.add(row)
+    db.session.commit()
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def parse_dates(req):
@@ -491,10 +515,32 @@ def api_colchon():
 @login_requerido
 def api_necesidades():
     desde, hasta = parse_dates(request)
-    movs = query_movs(desde, hasta, categoria="Necesidades", tipo="Gasto")
-    total = sum(float(m.importe) for m in movs)
-    por_mes = agrupar_mensual(movs, desde, hasta)
-    meses = len(por_mes)
+    movs = query_movs(desde, hasta, categoria="Necesidades")
+    movs_gasto = [m for m in movs if m.tipo == "Gasto"]
+    total = sum(float(m.importe) for m in movs_gasto)
+
+    # Tendencia mensual: ingresos, gastos y meta configurada, mes por mes —
+    # incluye el mes en curso aunque esté incompleto, la meta debe verse igual.
+    bucket = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
+    for m in movs:
+        bucket[(m.fecha.year, m.fecha.month)]["ingresos" if m.tipo == "Ingreso" else "gastos"] += float(m.importe)
+
+    tendencia = []
+    y, mo = desde.year, desde.month
+    while (y, mo) <= (hasta.year, hasta.month):
+        v = bucket.get((y, mo), {"ingresos": 0.0, "gastos": 0.0})
+        tendencia.append({
+            "mes": date_type(y, mo, 1).strftime("%b %Y"),
+            "ingresos": round(v["ingresos"], 2),
+            "gastos": round(v["gastos"], 2),
+            "meta": get_meta_necesidades_mes(y, mo),
+        })
+        mo += 1
+        if mo > 12:
+            mo = 1
+            y += 1
+
+    meses = len(tendencia)
 
     # Saldo disponible: todo el historial de Necesidades, sin importar el filtro de período.
     movs_todos = Movimiento.query.filter(Movimiento.categoria == "Necesidades").all()
@@ -507,12 +553,44 @@ def api_necesidades():
         "kpis": {
             "total_periodo": round(total, 2),
             "promedio_mensual": round(total / meses, 2) if meses else 0,
-            "num_transacciones": len(movs),
+            "num_transacciones": len(movs_gasto),
             "saldo_disponible": saldo_disponible,
         },
-        "top_items": top_items(movs),
-        "tendencia_mensual": [{"mes": i["mes"], "total": round(i["gastos"], 2)} for i in por_mes],
+        "top_items": top_items(movs_gasto),
+        "tendencia_mensual": tendencia,
     })
+
+
+@app.route("/api/necesidades/config", methods=["GET", "POST"])
+@login_requerido
+def api_necesidades_config():
+    hoy = hoy_local()
+
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            year  = int(data.get("year", hoy.year))
+            month = int(data.get("month", hoy.month))
+            monto = float(data["monto_meta"])
+            if not (1 <= month <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
+            if monto <= 0:
+                return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+            set_meta_necesidades_mes(year, month, monto)
+            return jsonify({"ok": True, "year": year, "month": month, "monto_meta": monto})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    try:
+        year  = int(request.args.get("year", hoy.year))
+        month = int(request.args.get("month", hoy.month))
+        if not (1 <= month <= 12):
+            raise ValueError
+    except (TypeError, ValueError):
+        year, month = hoy.year, hoy.month
+
+    return jsonify({"year": year, "month": month, "monto_meta": get_meta_necesidades_mes(year, month)})
 
 
 @app.route("/api/diversion")
