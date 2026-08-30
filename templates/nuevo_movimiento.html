@@ -105,10 +105,10 @@
       </label>
     </div>
 
-    <!-- Pago en dólares: solo visible en Necesidades + Gasto, opcional -->
-    <div class="form-field" id="necesidades-usd-check-block" style="display:none">
+    <!-- Pago en dólares: opcional en Necesidades + Gasto, o en Tarjeta (Gasto e Ingreso) -->
+    <div class="form-field" id="usd-check-block" style="display:none">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text)">
-        <input type="checkbox" id="necesidades_usd_check" style="width:16px;height:16px;accent-color:#818cf8">
+        <input type="checkbox" id="usd_check" style="width:16px;height:16px;accent-color:#818cf8">
         Pago en dólares
       </label>
     </div>
@@ -224,17 +224,28 @@
     return tipo === 'Gasto' && cat === 'Necesidades';
   }
 
-  function isNecesidadesUsd() {
-    return isNecesidadesGasto() && document.getElementById('necesidades_usd_check').checked;
+  function isTarjetaCategoria() {
+    return document.querySelector('input[name="categoria"]:checked')?.value === 'Tarjeta';
   }
 
-  function updateNecesidadesUsdCheckVisibility() {
-    const block = document.getElementById('necesidades-usd-check-block');
-    if (isNecesidadesGasto()) {
+  // Necesidades solo admite dólares en Gasto; Tarjeta los admite tanto al
+  // gastar (consumo en USD) como al pagar (repago en USD), ya que la
+  // tarjeta permite ambas monedas en las dos direcciones.
+  function isUsdEligible() {
+    return isNecesidadesGasto() || isTarjetaCategoria();
+  }
+
+  function isUsdMode() {
+    return isUsdEligible() && document.getElementById('usd_check').checked;
+  }
+
+  function updateUsdCheckVisibility() {
+    const block = document.getElementById('usd-check-block');
+    if (isUsdEligible()) {
       block.style.display = '';
     } else {
       block.style.display = 'none';
-      document.getElementById('necesidades_usd_check').checked = false;
+      document.getElementById('usd_check').checked = false;
     }
   }
 
@@ -342,7 +353,7 @@
     updateTipoMetaVisibility();
     updateDescripcionHint();
     updateDiasTrabajoVisibility();
-    updateNecesidadesUsdCheckVisibility();
+    updateUsdCheckVisibility();
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');
@@ -386,7 +397,7 @@
     }
 
     const showAsset = isInversionGasto();
-    const showUsd = showAsset || isNecesidadesUsd();
+    const showUsd = showAsset || isUsdMode();
     document.getElementById('asset-block').style.display      = showAsset ? '' : 'none';
     document.getElementById('usd-block').style.display        = showUsd ? '' : 'none';
     document.getElementById('importe-field').style.display    = showUsd ? 'none' : '';
@@ -550,7 +561,7 @@
   );
 
   document.getElementById('dias-trabajo-mes').addEventListener('change', loadDiasTrabajoParaMes);
-  document.getElementById('necesidades_usd_check').addEventListener('change', updateVisibility);
+  document.getElementById('usd_check').addEventListener('change', updateVisibility);
 
   fetchRate().then(updateVisibility);
 </script>
