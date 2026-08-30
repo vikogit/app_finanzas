@@ -25,8 +25,8 @@
     <div class="kpi-icon" style="background:rgba(249,115,22,0.15)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z"/></svg>
     </div>
-    <div class="kpi-label">Total período</div>
-    <div class="kpi-value" style="color:#fb923c" id="kpi-total">S/ —</div>
+    <div class="kpi-label">Saldo disponible</div>
+    <div class="kpi-value" style="color:#fb923c" id="kpi-saldo">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(249,115,22,0.1)">
@@ -54,11 +54,16 @@
 <div class="charts-grid-main">
   <div class="card card-p">
     <div class="chart-title">
-      Evolución de gastos de ocio
-      <span class="chart-badge badge-orange">Área · eToro</span>
+      Ingresos vs Gastos por mes
+      <span class="chart-badge badge-orange">Barras + Meta</span>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Ingresos</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Gastos</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Meta mensual</div>
     </div>
     <div class="chart-area-wrap">
-      <canvas id="chartArea"></canvas>
+      <canvas id="chartTendencia"></canvas>
     </div>
   </div>
   <div class="card card-p">
@@ -75,37 +80,105 @@
 
 {% block scripts %}
 <script>
-let chartArea = null, chartDonut = null;
+let chartTendencia = null, chartDonut = null;
+
+function fmtMoney(v) {
+  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function renderTendencia(tendencia) {
+  const ctx = document.getElementById('chartTendencia').getContext('2d');
+  const dark = document.documentElement.classList.contains('dark');
+  const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+  return new Chart(ctx, {
+    data: {
+      labels: tendencia.map(t => t.mes),
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Ingresos',
+          data: tendencia.map(t => t.ingresos),
+          backgroundColor: 'rgba(34,197,94,0.75)',
+          borderRadius: 4,
+        },
+        {
+          type: 'bar',
+          label: 'Gastos',
+          data: tendencia.map(t => -t.gastos),
+          backgroundColor: 'rgba(248,113,113,0.75)',
+          borderRadius: 4,
+        },
+        {
+          type: 'line',
+          label: 'Meta',
+          data: tendencia.map(t => t.meta),
+          borderColor: '#38bdf8',
+          borderWidth: 2,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          spanGaps: false,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: gridC }, ticks: { color: tickC, maxRotation: 0 } },
+        y: { grid: { color: gridC }, ticks: { color: tickC, callback: v => 'S/ ' + Math.abs(v).toLocaleString('es-PE') } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
+          titleColor: 'rgba(255,255,255,0.55)', bodyColor: '#f1f5f9',
+          borderColor: 'rgba(249,115,22,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
+          callbacks: { label: c => `${c.dataset.label}: ${fmtMoney(Math.abs(c.parsed.y ?? 0))}` }
+        }
+      }
+    }
+  });
+}
 
 function loadData(desde, hasta) {
   fetch(`/api/diversion?desde=${desde}&hasta=${hasta}`)
-    .then(r => r.json())
+    .then(async r => {
+      if (!r.ok) throw new Error(`Error del servidor (${r.status}): ${await r.text()}`);
+      return r.json();
+    })
     .then(data => {
-      const fmt = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-      document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
-      document.getElementById('kpi-pct').textContent   = data.kpis.pct_del_total + ' %';
-      document.getElementById('kpi-prom').textContent  = fmt(data.kpis.promedio_mensual);
-      document.getElementById('kpi-max').textContent   = fmt(data.kpis.gasto_max);
+      const kpiSaldo = document.getElementById('kpi-saldo');
+      kpiSaldo.textContent = fmtMoney(data.kpis.saldo_disponible);
+      kpiSaldo.style.color = data.kpis.saldo_disponible >= 0 ? '#fb923c' : '#f87171';
+      document.getElementById('kpi-pct').textContent  = data.kpis.pct_del_total + ' %';
+      document.getElementById('kpi-prom').textContent = fmtMoney(data.kpis.promedio_mensual);
+      document.getElementById('kpi-max').textContent  = fmtMoney(data.kpis.gasto_max);
 
-      if (chartArea)  { chartArea.destroy();  window._charts = window._charts.filter(c=>c!==chartArea);  }
-      if (chartDonut) { chartDonut.destroy(); window._charts = window._charts.filter(c=>c!==chartDonut); }
+      if (chartTendencia) { chartTendencia.destroy(); window._charts = window._charts.filter(c=>c!==chartTendencia); }
+      if (chartDonut)     { chartDonut.destroy();     window._charts = window._charts.filter(c=>c!==chartDonut);     }
 
       const center = `<div class="donut-center-val" style="color:#f97316">${data.kpis.pct_del_total}%</div>
                       <div class="donut-center-lbl">Del total</div>`;
 
-      chartArea  = renderEtoroChart('chartArea', data.por_mes.map(d=>d.mes), data.por_mes.map(d=>d.total), '#f97316', 249, 115, 22);
+      chartTendencia = renderTendencia(data.tendencia_mensual);
       chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
 
-      window._charts.push(chartArea, chartDonut);
+      window._charts.push(chartTendencia, chartDonut);
+    })
+    .catch(e => {
+      console.error(e);
+      document.getElementById('kpi-saldo').textContent = 'Error';
     });
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const d = getDefaultDates();
-  document.getElementById('desde').value = d.desde;
-  document.getElementById('hasta').value = d.hasta;
-  document.querySelector('[data-qf="mes"]').classList.add('active');
-  loadData(d.desde, d.hasta);
+  const desde = '2025-07-01';
+  const hasta = localDateStr(new Date());
+  document.getElementById('desde').value = desde;
+  document.getElementById('hasta').value = hasta;
+  loadData(desde, hasta);
 });
 </script>
 {% endblock %}

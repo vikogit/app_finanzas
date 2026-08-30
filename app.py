@@ -117,6 +117,30 @@ def set_meta_necesidades_mes(year, month, monto):
     db.session.commit()
 
 
+class MetaDiversionMes(db.Model):
+    __tablename__ = "metas_diversion_mes"
+    id         = db.Column(db.Integer, primary_key=True)
+    year       = db.Column(db.Integer, nullable=False)
+    month      = db.Column(db.Integer, nullable=False)
+    monto_meta = db.Column(db.Numeric(10, 2), nullable=False)
+    __table_args__ = (db.UniqueConstraint("year", "month", name="uq_metas_diversion_mes_year_month"),)
+
+
+def get_meta_diversion_mes(year, month):
+    row = MetaDiversionMes.query.filter_by(year=year, month=month).first()
+    return float(row.monto_meta) if row else None
+
+
+def set_meta_diversion_mes(year, month, monto):
+    row = MetaDiversionMes.query.filter_by(year=year, month=month).first()
+    if row:
+        row.monto_meta = monto
+    else:
+        row = MetaDiversionMes(year=year, month=month, monto_meta=monto)
+        db.session.add(row)
+    db.session.commit()
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def parse_dates(req):
@@ -597,24 +621,86 @@ def api_necesidades_config():
 @login_requerido
 def api_diversion():
     desde, hasta = parse_dates(request)
-    movs_div = query_movs(desde, hasta, categoria="Diversión", tipo="Gasto")
-    movs_all = query_movs(desde, hasta, tipo="Gasto")
-    total_div  = sum(float(m.importe) for m in movs_div)
-    total_gast = sum(float(m.importe) for m in movs_all)
+    movs_div = query_movs(desde, hasta, categoria="Diversión")
+    movs_div_gasto = [m for m in movs_div if m.tipo == "Gasto"]
+    movs_all_gasto = query_movs(desde, hasta, tipo="Gasto")
+    total_div  = sum(float(m.importe) for m in movs_div_gasto)
+    total_gast = sum(float(m.importe) for m in movs_all_gasto)
     pct = round(total_div / total_gast * 100, 1) if total_gast else 0
-    por_mes = agrupar_mensual(movs_div, desde, hasta)
-    meses = len(por_mes)
-    importes = [float(m.importe) for m in movs_div]
+    importes = [float(m.importe) for m in movs_div_gasto]
+
+    # Tendencia mensual: ingresos, gastos y meta configurada, mes por mes —
+    # incluye el mes en curso aunque esté incompleto, la meta debe verse igual.
+    bucket = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
+    for m in movs_div:
+        bucket[(m.fecha.year, m.fecha.month)]["ingresos" if m.tipo == "Ingreso" else "gastos"] += float(m.importe)
+
+    tendencia = []
+    y, mo = desde.year, desde.month
+    while (y, mo) <= (hasta.year, hasta.month):
+        v = bucket.get((y, mo), {"ingresos": 0.0, "gastos": 0.0})
+        tendencia.append({
+            "mes": date_type(y, mo, 1).strftime("%b %Y"),
+            "ingresos": round(v["ingresos"], 2),
+            "gastos": round(v["gastos"], 2),
+            "meta": get_meta_diversion_mes(y, mo),
+        })
+        mo += 1
+        if mo > 12:
+            mo = 1
+            y += 1
+
+    meses = len(tendencia)
+
+    # Saldo disponible: todo el historial de Diversión, sin importar el filtro de período.
+    movs_todos = Movimiento.query.filter(Movimiento.categoria == "Diversión").all()
+    saldo_disponible = round(
+        sum(float(m.importe) for m in movs_todos if m.tipo == "Ingreso") -
+        sum(float(m.importe) for m in movs_todos if m.tipo == "Gasto"), 2
+    )
+
     return jsonify({
         "kpis": {
-            "total_periodo": round(total_div, 2),
             "pct_del_total": pct,
             "promedio_mensual": round(total_div / meses, 2) if meses else 0,
             "gasto_max": round(max(importes), 2) if importes else 0,
+            "saldo_disponible": saldo_disponible,
         },
-        "por_mes": [{"mes": i["mes"], "total": round(i["gastos"], 2)} for i in por_mes],
-        "top_items": top_items(movs_div),
+        "tendencia_mensual": tendencia,
+        "top_items": top_items(movs_div_gasto),
     })
+
+
+@app.route("/api/diversion/config", methods=["GET", "POST"])
+@login_requerido
+def api_diversion_config():
+    hoy = hoy_local()
+
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            year  = int(data.get("year", hoy.year))
+            month = int(data.get("month", hoy.month))
+            monto = float(data["monto_meta"])
+            if not (1 <= month <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
+            if monto <= 0:
+                return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+            set_meta_diversion_mes(year, month, monto)
+            return jsonify({"ok": True, "year": year, "month": month, "monto_meta": monto})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    try:
+        year  = int(request.args.get("year", hoy.year))
+        month = int(request.args.get("month", hoy.month))
+        if not (1 <= month <= 12):
+            raise ValueError
+    except (TypeError, ValueError):
+        year, month = hoy.year, hoy.month
+
+    return jsonify({"year": year, "month": month, "monto_meta": get_meta_diversion_mes(year, month)})
 
 
 @app.route("/api/inversion")

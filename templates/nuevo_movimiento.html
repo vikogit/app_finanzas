@@ -151,6 +151,21 @@
       </div>
     </div>
 
+    <!-- Meta mensual de Diversión: solo visible en categoría Diversión, una meta por mes -->
+    <div class="form-field" id="diversion-meta-block" style="display:none">
+      <span class="form-label">Meta mensual de diversión</span>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <input type="month" id="diversion-meta-mes" class="form-input" style="max-width:160px">
+        <div class="form-input-prefix" style="flex:0 0 auto">
+          <span class="form-prefix">S/</span>
+          <input type="number" id="diversion-meta-input" min="0" step="0.01"
+                 class="form-input" style="max-width:120px" placeholder="200.00">
+        </div>
+        <button type="button" class="btn-cancel" style="padding:9px 16px" onclick="guardarMetaDiversion()">Guardar</button>
+        <span id="diversion-meta-feedback" style="font-size:12px"></span>
+      </div>
+    </div>
+
     <!-- Meta de días trabajados al mes: solo visible en categoría Earnings, una meta por mes -->
     <div class="form-field" id="dias-trabajo-block" style="display:none">
       <span class="form-label">Meta de días trabajados al mes</span>
@@ -431,6 +446,67 @@
       });
   }
 
+  let diversionMetaLoaded = false;
+
+  function updateDiversionMetaVisibility() {
+    const cat = document.querySelector('input[name="categoria"]:checked')?.value;
+    const block = document.getElementById('diversion-meta-block');
+    if (cat === 'Diversión') {
+      block.style.display = '';
+      if (!diversionMetaLoaded) {
+        diversionMetaLoaded = true;
+        document.getElementById('diversion-meta-mes').value = localYearMonthStr(new Date());
+        loadMetaDiversionParaMes();
+      }
+    } else {
+      block.style.display = 'none';
+    }
+  }
+
+  function loadMetaDiversionParaMes() {
+    const val = document.getElementById('diversion-meta-mes').value;
+    if (!val) return;
+    const [y, m] = val.split('-').map(Number);
+    fetch(`/api/diversion/config?year=${y}&month=${m}`)
+      .then(r => r.json())
+      .then(d => { document.getElementById('diversion-meta-input').value = d.monto_meta ?? ''; })
+      .catch(() => {});
+  }
+
+  function guardarMetaDiversion() {
+    const mesVal = document.getElementById('diversion-meta-mes').value;
+    const input = document.getElementById('diversion-meta-input');
+    const feedback = document.getElementById('diversion-meta-feedback');
+    const monto = parseFloat(input.value);
+    if (!mesVal) {
+      feedback.textContent = 'Selecciona el mes.';
+      feedback.style.color = '#f87171';
+      return;
+    }
+    if (!monto || monto <= 0) {
+      feedback.textContent = 'Ingresa un monto mayor a 0.';
+      feedback.style.color = '#f87171';
+      return;
+    }
+    const [y, m] = mesVal.split('-').map(Number);
+    fetch('/api/diversion/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year: y, month: m, monto_meta: monto }),
+    })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Error al guardar');
+        feedback.textContent = 'Guardado ✓';
+        feedback.style.color = '#4ade80';
+        setTimeout(() => { feedback.textContent = ''; }, 2500);
+      })
+      .catch(e => {
+        feedback.textContent = e.message;
+        feedback.style.color = '#f87171';
+      });
+  }
+
   let diasTrabajoLoaded = false;
 
   function updateDiasTrabajoVisibility() {
@@ -517,6 +593,7 @@
     updateDescripcionHint();
     updateDiasTrabajoVisibility();
     updateNecesidadesMetaVisibility();
+    updateDiversionMetaVisibility();
     updateUsdCheckVisibility();
     updateIngresoLabel();
     updateRdTrainingVisibility();
@@ -736,6 +813,7 @@
 
   document.getElementById('dias-trabajo-mes').addEventListener('change', loadDiasTrabajoParaMes);
   document.getElementById('necesidades-meta-mes').addEventListener('change', loadMetaNecesidadesParaMes);
+  document.getElementById('diversion-meta-mes').addEventListener('change', loadMetaDiversionParaMes);
   document.getElementById('usd_check').addEventListener('change', updateVisibility);
 
   fetchRate().then(updateVisibility);
