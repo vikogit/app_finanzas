@@ -54,7 +54,7 @@
         </div>
         <div class="pill-radio">
           <input type="radio" id="ingreso" name="tipo" value="Ingreso">
-          <label for="ingreso">Ingreso</label>
+          <label for="ingreso" id="ingreso-label">Ingreso</label>
         </div>
         <div class="pill-radio" id="tipo-meta-wrap" style="display:none">
           <input type="radio" id="meta" name="tipo" value="Meta">
@@ -228,6 +228,10 @@
     return document.querySelector('input[name="categoria"]:checked')?.value === 'Tarjeta';
   }
 
+  function updateIngresoLabel() {
+    document.getElementById('ingreso-label').textContent = isTarjetaCategoria() ? 'Repago' : 'Ingreso';
+  }
+
   // Necesidades solo admite dólares en Gasto; Tarjeta los admite tanto al
   // gastar (consumo en USD) como al pagar (repago en USD), ya que la
   // tarjeta permite ambas monedas en las dos direcciones.
@@ -354,6 +358,7 @@
     updateDescripcionHint();
     updateDiasTrabajoVisibility();
     updateUsdCheckVisibility();
+    updateIngresoLabel();
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');
