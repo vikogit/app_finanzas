@@ -306,19 +306,6 @@ def nuevo():
             except Exception as e:
                 db.session.rollback()
                 return f"Error al guardar: {str(e)}"
-        if request.form.get("tipo") == "Pago tarjeta":
-            try:
-                fecha = datetime.strptime(request.form["fecha"], "%Y-%m-%d").date()
-                monto = float(request.form["importe"])
-                if monto <= 0:
-                    return "Error al guardar: el monto del pago debe ser mayor a 0"
-                pago = PagoTarjeta(fecha=fecha, monto=monto, nota=request.form.get("descripcion") or None)
-                db.session.add(pago)
-                db.session.commit()
-                return redirect(url_for("dashboard_tarjeta"))
-            except Exception as e:
-                db.session.rollback()
-                return f"Error al guardar: {str(e)}"
         try:
             m = Movimiento(
                 fecha=datetime.strptime(request.form["fecha"], "%Y-%m-%d").date(),
@@ -795,9 +782,19 @@ def api_tarjeta():
     hoy = hoy_local()
     cargos_movs = Movimiento.query.filter(
         Movimiento.tipo == "Gasto",
-        Movimiento.pagado_con_tarjeta.is_(True),
+        db.or_(Movimiento.pagado_con_tarjeta.is_(True), Movimiento.categoria == "Tarjeta"),
     ).all()
-    pagos = PagoTarjeta.query.order_by(PagoTarjeta.fecha).all()
+
+    # Los pagos de tarjeta vienen de dos fuentes: la categoría "Tarjeta" + tipo
+    # Ingreso (flujo actual) y la tabla legada PagoTarjeta (del tipo "Pago
+    # tarjeta" ya retirado) — se combinan para no perder pagos ya registrados.
+    pagos_movs  = Movimiento.query.filter(Movimiento.tipo == "Ingreso", Movimiento.categoria == "Tarjeta").all()
+    pagos_viejos = PagoTarjeta.query.all()
+    pagos = sorted(
+        [{"fecha": p.fecha, "monto": float(p.importe), "nota": p.descripcion, "id": p.id, "origen": "movimiento"} for p in pagos_movs] +
+        [{"fecha": p.fecha, "monto": float(p.monto), "nota": p.nota, "id": p.id, "origen": "pago_tarjeta"} for p in pagos_viejos],
+        key=lambda p: p["fecha"],
+    )
 
     cargos_por_ciclo = defaultdict(float)
     for m in cargos_movs:
@@ -819,7 +816,7 @@ def api_tarjeta():
 
     # FIFO: cada pago se aplica al ciclo pendiente más antiguo primero.
     for pago in pagos:
-        restante = float(pago.monto)
+        restante = pago["monto"]
         for c in ciclos:
             if restante <= 0:
                 break
@@ -857,10 +854,11 @@ def api_tarjeta():
         },
         "ciclos": ciclos,
         "pagos": [{
-            "id": p.id,
-            "fecha": p.fecha.strftime("%Y-%m-%d"),
-            "monto": float(p.monto),
-            "nota": p.nota,
+            "id": p["id"],
+            "fecha": p["fecha"].strftime("%Y-%m-%d"),
+            "monto": round(p["monto"], 2),
+            "nota": p["nota"],
+            "origen": p["origen"],
         } for p in reversed(pagos)],
     })
 

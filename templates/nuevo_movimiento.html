@@ -60,10 +60,6 @@
           <input type="radio" id="meta" name="tipo" value="Meta">
           <label for="meta">Meta</label>
         </div>
-        <div class="pill-radio">
-          <input type="radio" id="pago_tarjeta" name="tipo" value="Pago tarjeta">
-          <label for="pago_tarjeta">Pago tarjeta</label>
-        </div>
       </div>
     </div>
 
@@ -94,10 +90,14 @@
           <input type="radio" id="earnings" name="categoria" value="Earnings">
           <label for="earnings">Earnings</label>
         </div>
+        <div class="pill-radio">
+          <input type="radio" id="tarjeta" name="categoria" value="Tarjeta">
+          <label for="tarjeta">Tarjeta</label>
+        </div>
       </div>
     </div>
 
-    <!-- Pagado con tarjeta: solo visible en Gasto (cualquier categoría) -->
+    <!-- Pagado con tarjeta: solo visible en Gasto de otras categorías (en "Tarjeta" ya está implícito) -->
     <div class="form-field" id="tarjeta-check-block" style="display:none">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text)">
         <input type="checkbox" id="pagado_con_tarjeta" name="pagado_con_tarjeta" value="1" style="width:16px;height:16px;accent-color:#7c3aed">
@@ -242,10 +242,6 @@
     return document.querySelector('input[name="tipo"]:checked')?.value === 'Meta';
   }
 
-  function isPagoTarjeta() {
-    return document.querySelector('input[name="tipo"]:checked')?.value === 'Pago tarjeta';
-  }
-
   function updateTipoMetaVisibility() {
     const cat = document.querySelector('input[name="categoria"]:checked')?.value;
     const wrap = document.getElementById('tipo-meta-wrap');
@@ -266,7 +262,7 @@
   function updateDiasTrabajoVisibility() {
     const cat = document.querySelector('input[name="categoria"]:checked')?.value;
     const block = document.getElementById('dias-trabajo-block');
-    if (cat === 'Earnings' && !isPagoTarjeta()) {
+    if (cat === 'Earnings') {
       block.style.display = '';
       if (!diasTrabajoLoaded) {
         diasTrabajoLoaded = true;
@@ -327,9 +323,12 @@
     const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
     const label = document.querySelector('#descripcion-field .form-label');
     const input = document.getElementById('descripcion');
-    if (tipo === 'Pago tarjeta') {
-      label.textContent = 'Nota (opcional)';
+    if (cat === 'Tarjeta' && tipo === 'Ingreso') {
+      label.textContent = 'Nota del pago';
       input.placeholder = 'Ej: pago del ciclo de agosto...';
+    } else if (cat === 'Tarjeta' && tipo === 'Gasto') {
+      label.textContent = 'Descripción del consumo';
+      input.placeholder = 'Ej: Netflix, Uber, supermercado...';
     } else if (cat === 'Earnings' && tipo === 'Ingreso') {
       label.textContent = 'Fuente de ingreso';
       input.placeholder = 'Ej: Sueldo, Freelance, Clases particulares...';
@@ -353,24 +352,6 @@
     const tarjetaCheckBlock = document.getElementById('tarjeta-check-block');
     const descField = document.getElementById('descripcion-field');
     const desc = document.getElementById('descripcion');
-
-    if (isPagoTarjeta()) {
-      fechaLabel.textContent = 'Fecha';
-      importeLabel.textContent = 'Monto del pago (S/)';
-      fechaFinField.style.display = 'none';
-      fechaFinInput.removeAttribute('required');
-      fechaFinInput.value = '';
-      catField.style.display = 'none';
-      tarjetaCheckBlock.style.display = 'none';
-      document.getElementById('pagado_con_tarjeta').checked = false;
-      document.getElementById('asset-block').style.display = 'none';
-      document.getElementById('usd-block').style.display = 'none';
-      descField.style.display = '';
-      desc.removeAttribute('required');
-      document.getElementById('importe-field').style.display = '';
-      document.getElementById('importe').setAttribute('required', '');
-      return;
-    }
 
     catField.style.display = '';
 
@@ -396,7 +377,8 @@
     fechaFinInput.value = '';
 
     const tipoActual = document.querySelector('input[name="tipo"]:checked')?.value;
-    if (tipoActual === 'Gasto') {
+    const catActual  = document.querySelector('input[name="categoria"]:checked')?.value;
+    if (tipoActual === 'Gasto' && catActual !== 'Tarjeta') {
       tarjetaCheckBlock.style.display = '';
     } else {
       tarjetaCheckBlock.style.display = 'none';
@@ -519,21 +501,6 @@
 
   // ── Validación al enviar ──────────────────────────────────────────────
   document.getElementById('form-nuevo').addEventListener('submit', function(e) {
-    if (isPagoTarjeta()) {
-      const fecha = document.getElementById('fecha').value;
-      const monto = document.getElementById('importe').value;
-      if (!fecha) {
-        e.preventDefault();
-        alert('Por favor selecciona la fecha del pago.');
-        return;
-      }
-      if (!monto || parseFloat(monto) <= 0) {
-        e.preventDefault();
-        alert('Por favor ingresa un monto de pago mayor a 0.');
-        return;
-      }
-      return;
-    }
     if (isMeta()) {
       const desde = document.getElementById('fecha').value;
       const hasta = document.getElementById('fecha_fin').value;

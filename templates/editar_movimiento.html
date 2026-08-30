@@ -32,7 +32,7 @@
     <div class="form-field">
       <span class="form-label">Categoría</span>
       <div class="pill-group">
-        {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings'] %}
+        {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings', 'Tarjeta'] %}
         <div class="pill-radio">
           <input type="radio" id="cat-{{ loop.index }}" name="categoria" value="{{ cat }}" {% if m.categoria == cat %}checked{% endif %}>
           <label for="cat-{{ loop.index }}">{{ cat }}</label>
@@ -41,8 +41,8 @@
       </div>
     </div>
 
-    <!-- Pagado con tarjeta: solo visible en Gasto -->
-    <div class="form-field" id="tarjeta-check-block" style="{{ '' if m.tipo == 'Gasto' else 'display:none' }}">
+    <!-- Pagado con tarjeta: solo visible en Gasto de otras categorías (en "Tarjeta" ya está implícito) -->
+    <div class="form-field" id="tarjeta-check-block" style="{{ '' if (m.tipo == 'Gasto' and m.categoria != 'Tarjeta') else 'display:none' }}">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text)">
         <input type="checkbox" id="pagado_con_tarjeta" name="pagado_con_tarjeta" value="1"
                {% if m.pagado_con_tarjeta %}checked{% endif %} style="width:16px;height:16px;accent-color:#7c3aed">
@@ -88,13 +88,15 @@
 <script>
   function toggleTarjetaCheck() {
     const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
-    document.getElementById('tarjeta-check-block').style.display = tipo === 'Gasto' ? '' : 'none';
+    const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
+    document.getElementById('tarjeta-check-block').style.display = (tipo === 'Gasto' && cat !== 'Tarjeta') ? '' : 'none';
+    if (cat === 'Tarjeta') document.getElementById('pagado_con_tarjeta').checked = false;
   }
   function toggleAssetFields() {
     const cat = document.querySelector('input[name="categoria"]:checked')?.value;
     document.getElementById('asset-fields').style.display = cat === 'Inversión' ? '' : 'none';
   }
-  document.querySelectorAll('input[name="tipo"]').forEach(el => el.addEventListener('change', toggleTarjetaCheck));
+  document.querySelectorAll('input[name="tipo"], input[name="categoria"]').forEach(el => el.addEventListener('change', toggleTarjetaCheck));
   document.querySelectorAll('input[name="categoria"]').forEach(el => el.addEventListener('change', toggleAssetFields));
 </script>
 {% endblock %}
