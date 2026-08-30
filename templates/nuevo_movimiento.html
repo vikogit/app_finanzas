@@ -239,14 +239,12 @@
   // Necesidades solo admite dólares en Gasto; Tarjeta los admite tanto al
   // gastar (consumo en USD) como al pagar (repago en USD), ya que la
   // tarjeta permite ambas monedas en las dos direcciones.
-  function isRdIngreso() {
-    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
-    const cat  = document.querySelector('input[name="categoria"]:checked')?.value;
-    return tipo === 'Ingreso' && cat === 'R&D';
+  function isRdCategoria() {
+    return document.querySelector('input[name="categoria"]:checked')?.value === 'R&D';
   }
 
   function isUsdEligible() {
-    return isNecesidadesGasto() || isTarjetaCategoria() || isRdIngreso();
+    return isNecesidadesGasto() || isTarjetaCategoria() || isRdCategoria();
   }
 
   function isUsdMode() {
