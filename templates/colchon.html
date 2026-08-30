@@ -97,11 +97,11 @@ function loadData(desde, hasta) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  const desde = '2025-07-01';
   const hasta = localDateStr(new Date());
-  document.getElementById('desde').value = '2000-01-01';
+  document.getElementById('desde').value = desde;
   document.getElementById('hasta').value = hasta;
-  document.querySelector('[data-qf="todo"]').classList.add('active');
-  loadData('2000-01-01', hasta);
+  loadData(desde, hasta);
 });
 </script>
 {% endblock %}
