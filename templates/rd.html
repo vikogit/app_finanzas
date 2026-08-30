@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}R & D — App Finanzas{% endblock %}
+
+{% block content %}
+<style>
+  .compliance-strip { display: flex; gap: 4px; margin-top: 10px; }
+  .compliance-cell {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 2px; border-radius: 8px; background: var(--bg-card2);
+  }
+  .compliance-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .compliance-dot.ok  { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.5); }
+  .compliance-dot.bad { background: #f87171; }
+  .compliance-mes { font-size: 9px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+  .kpi-pct { font-size: 11px; font-weight: 700; margin-top: 4px; }
+</style>
+
+<div class="page-hdr">
+  <h1 class="page-title">R &amp; D</h1>
+  <p class="page-sub">Capacitación y desarrollo profesional — metas mensuales, fondo disponible y áreas de inversión.</p>
+</div>
+
+<div class="kpi-grid">
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(219,39,119,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+    </div>
+    <div class="kpi-label">Flujo R&amp;D este mes</div>
+    <div class="kpi-value" style="color:#f472b6" id="kpi-flujo">S/ — / S/ —</div>
+    <div class="kpi-pct" id="kpi-flujo-pct"></div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(96,165,250,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+    </div>
+    <div class="kpi-label">Cursos comprados este mes</div>
+    <div class="kpi-value" style="color:#60a5fa" id="kpi-cursos">— / —</div>
+    <div class="kpi-pct" id="kpi-cursos-pct"></div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-icon" style="background:rgba(74,222,128,0.15)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75"/></svg>
+    </div>
+    <div class="kpi-label">Fondo disponible</div>
+    <div class="kpi-value" id="kpi-fondo">S/ —</div>
+  </div>
+</div>
+
+<div class="card card-p" style="margin-bottom:14px">
+  <div class="chart-title">
+    Cumplimiento de metas mensuales
+    <span class="chart-badge badge-cyan" style="background:rgba(219,39,119,0.15);color:#f472b6">Últimos 12 meses</span>
+  </div>
+  <div class="chart-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>Ingresos a R&amp;D</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Meta S/ 150</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>Curso comprado</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Sin curso</div>
+  </div>
+  <div style="position:relative;height:240px">
+    <canvas id="chartCumplimiento"></canvas>
+  </div>
+  <div class="compliance-strip" id="compliance-strip"></div>
+</div>
+
+<div class="charts-grid-main" style="margin-bottom:20px">
+  <div class="card card-p">
+    <div class="chart-title">
+      Flujo del fondo R&amp;D
+      <span class="chart-badge badge-cyan" style="background:rgba(219,39,119,0.15);color:#f472b6">Saldo acumulado</span>
+    </div>
+    <div class="chart-area-wrap">
+      <canvas id="chartFlujo"></canvas>
+    </div>
+  </div>
+  <div class="card card-p">
+    <div class="chart-title">
+      Inversión por área
+      <span class="chart-badge badge-cyan" style="background:rgba(219,39,119,0.15);color:#f472b6">Pastel</span>
+    </div>
+    <div class="chart-donut-wrap">
+      <canvas id="chartArea"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let chartCumplimiento = null, chartFlujo = null, chartArea = null;
+
+function fmtMoney(v) {
+  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function epochToDate(epochDay) {
+  return new Date(epochDay * 86400000);
+}
+
+function fmtEpochDay(epochDay) {
+  return epochToDate(epochDay).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+}
+
+function renderCumplimiento(c) {
+  const ctx = document.getElementById('chartCumplimiento').getContext('2d');
+  const dark = document.documentElement.classList.contains('dark');
+  const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+  return new Chart(ctx, {
+    data: {
+      labels: c.meses,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Ingresos',
+          data: c.ingresos,
+          backgroundColor: 'rgba(244,114,182,0.75)',
+          borderRadius: 4,
+        },
+        {
+          type: 'line',
+          label: 'Meta',
+          data: c.meses.map(() => c.meta),
+          borderColor: '#38bdf8',
+          borderWidth: 2,
+          borderDash: [4, 3],
+          pointRadius: 0,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: gridC }, ticks: { color: tickC, maxRotation: 0 } },
+        y: { grid: { color: gridC }, ticks: { color: tickC, callback: v => 'S/ ' + v.toLocaleString('es-PE') } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
+          titleColor: 'rgba(255,255,255,0.55)', bodyColor: '#f1f5f9',
+          borderColor: 'rgba(219,39,119,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
+          callbacks: { label: c2 => `${c2.dataset.label}: ${fmtMoney(c2.parsed.y ?? 0)}` }
+        }
+      }
+    }
+  });
+}
+
+function renderComplianceStrip(c) {
+  const wrap = document.getElementById('compliance-strip');
+  wrap.innerHTML = c.meses.map((mes, i) => `
+    <div class="compliance-cell">
+      <div class="compliance-dot ${c.curso_comprado[i] ? 'ok' : 'bad'}"></div>
+      <div class="compliance-mes">${mes.split(' ')[0]}</div>
+    </div>`).join('');
+}
+
+function renderFlujo(puntos) {
+  const ctx = document.getElementById('chartFlujo').getContext('2d');
+  const dark = document.documentElement.classList.contains('dark');
+  const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+  const h = ctx.canvas.parentElement.offsetHeight || 260;
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(244,114,182,0.38)');
+  grad.addColorStop(0.55, 'rgba(244,114,182,0.1)');
+  grad.addColorStop(1, 'rgba(244,114,182,0)');
+
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Fondo',
+        data: puntos.map(p => ({ x: p.x, y: p.y })),
+        borderColor: '#f472b6',
+        borderWidth: 2.5,
+        backgroundColor: grad,
+        fill: true,
+        stepped: true,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#f472b6',
+        pointHoverBorderColor: dark ? '#060610' : '#fff',
+        pointHoverBorderWidth: 2.5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
+          titleColor: 'rgba(255,255,255,0.55)', bodyColor: '#f1f5f9',
+          borderColor: 'rgba(219,39,119,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
+          callbacks: {
+            title: items => items.length ? fmtEpochDay(items[0].parsed.x) : '',
+            label: c2 => {
+              const p = puntos[c2.dataIndex];
+              return [`Saldo: ${fmtMoney(c2.parsed.y)}`, `${p.tipo}: ${fmtMoney(p.monto)}`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grid: { display: false },
+          ticks: { color: tickC, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0, callback: v => fmtEpochDay(v) },
+        },
+        y: {
+          grid: { color: gridC, drawBorder: false },
+          ticks: { color: tickC, font: { size: 10 }, callback: v => 'S/' + v.toLocaleString('es-PE') },
+        }
+      }
+    }
+  });
+}
+
+function loadRd() {
+  fetch('/api/rd')
+    .then(r => r.json())
+    .then(data => {
+      const kpiFlujo = document.getElementById('kpi-flujo');
+      kpiFlujo.textContent = `${fmtMoney(data.kpis.flujo_mes_actual)} / ${fmtMoney(data.kpis.meta_flujo_mensual)}`;
+      const flujoPct = document.getElementById('kpi-flujo-pct');
+      flujoPct.textContent = data.kpis.pct_flujo + '%';
+      flujoPct.style.color = data.kpis.pct_flujo >= 100 ? '#4ade80' : '#f87171';
+
+      document.getElementById('kpi-cursos').textContent = `${data.kpis.cursos_mes_actual} / ${data.kpis.meta_cursos_mensual}`;
+      const cursosPct = document.getElementById('kpi-cursos-pct');
+      cursosPct.textContent = data.kpis.pct_cursos + '%';
+      cursosPct.style.color = data.kpis.pct_cursos >= 100 ? '#4ade80' : '#f87171';
+
+      const kpiFondo = document.getElementById('kpi-fondo');
+      kpiFondo.textContent = fmtMoney(data.kpis.fondo_disponible);
+      kpiFondo.style.color = data.kpis.fondo_disponible >= 0 ? '#4ade80' : '#f87171';
+
+      [chartCumplimiento, chartFlujo, chartArea].forEach(c => {
+        if (c) { c.destroy(); window._charts = window._charts.filter(x => x !== c); }
+      });
+
+      chartCumplimiento = renderCumplimiento(data.cumplimiento_mensual);
+      renderComplianceStrip(data.cumplimiento_mensual);
+      chartFlujo = renderFlujo(data.flujo_fondo);
+      chartArea = renderDonutChart(
+        'chartArea',
+        data.por_area.length ? data.por_area : [{label:'Sin datos', value:1}],
+        `<div class="donut-center-val" style="color:#f472b6">${fmtMoney(data.kpis.fondo_disponible)}</div><div class="donut-center-lbl">Fondo</div>`
+      );
+
+      window._charts.push(chartCumplimiento, chartFlujo, chartArea);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', loadRd);
+</script>
+{% endblock %}

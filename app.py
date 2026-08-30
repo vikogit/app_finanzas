@@ -286,6 +286,12 @@ def dashboard_tarjeta():
     return render_template("tarjeta.html", active_tab="tarjeta")
 
 
+@app.route("/dashboard/rd")
+@login_requerido
+def dashboard_rd():
+    return render_template("rd.html", active_tab="rd")
+
+
 @app.route("/nuevo", methods=["GET", "POST"])
 @login_requerido
 def nuevo():
@@ -870,6 +876,85 @@ def api_tarjeta_pago_delete(id):
     db.session.delete(p)
     db.session.commit()
     return jsonify({"ok": True})
+
+
+# ── Research & Development (R&D) ───────────────────────────────────────
+RD_META_INGRESO_MES = 150.0
+RD_META_CURSOS_MES = 1
+RD_AREAS = ["Enseñanza & Idiomas", "Tecnología e IA", "Negocios & Finanzas", "Desarrollo Creativo"]
+RD_SUBAREAS = {
+    "Enseñanza & Idiomas": ["Certificaciones (TEFL/TESOL/TKT/CELTA)", "Metodología & Didáctica", "Material Didáctico"],
+    "Tecnología e IA": ["IA Generativa & Prompting", "Herramientas Digitales", "Automatización"],
+    "Negocios & Finanzas": ["Finanzas Personales e Inversión", "Emprendimiento", "Marketing Educativo"],
+    "Desarrollo Creativo": ["Teoría Musical & Instrumento", "Producción & Audio"],
+}
+
+
+@app.route("/api/rd")
+@login_requerido
+def api_rd():
+    hoy = hoy_local()
+    movs = Movimiento.query.filter(Movimiento.categoria == "R&D").order_by(Movimiento.fecha).all()
+    ingresos = [m for m in movs if m.tipo == "Ingreso"]
+    gastos   = [m for m in movs if m.tipo == "Gasto"]
+
+    flujo_mes  = sum(float(m.importe) for m in ingresos if m.fecha.year == hoy.year and m.fecha.month == hoy.month)
+    cursos_mes = sum(1 for m in gastos if m.fecha.year == hoy.year and m.fecha.month == hoy.month)
+    fondo = round(sum(float(m.importe) for m in ingresos) - sum(float(m.importe) for m in gastos), 2)
+
+    # Cumplimiento mensual: últimos 12 meses (ventana móvil, terminando en el mes actual)
+    ventana = []
+    y, m = hoy.year, hoy.month
+    for _ in range(12):
+        ventana.append((y, m))
+        y, m = _add_months(y, m, -1)
+    ventana.reverse()
+
+    ingresos_por_mes = defaultdict(float)
+    cursos_por_mes = defaultdict(int)
+    for mv in ingresos:
+        ingresos_por_mes[(mv.fecha.year, mv.fecha.month)] += float(mv.importe)
+    for mv in gastos:
+        cursos_por_mes[(mv.fecha.year, mv.fecha.month)] += 1
+
+    cumplimiento_mensual = {
+        "meses": [f"{MESES_ES[mm][:3]} {yy}" for yy, mm in ventana],
+        "ingresos": [round(ingresos_por_mes.get(k, 0.0), 2) for k in ventana],
+        "meta": RD_META_INGRESO_MES,
+        "curso_comprado": [cursos_por_mes.get(k, 0) >= RD_META_CURSOS_MES for k in ventana],
+    }
+
+    # Flujo del fondo: saldo acumulado en el instante exacto de cada transacción
+    flujo_fondo = []
+    saldo = 0.0
+    for mv in movs:
+        delta = float(mv.importe) if mv.tipo == "Ingreso" else -float(mv.importe)
+        saldo = round(saldo + delta, 2)
+        flujo_fondo.append({
+            "x": to_epoch_day(mv.fecha), "y": saldo,
+            "fecha": mv.fecha.strftime("%Y-%m-%d"), "tipo": mv.tipo, "monto": float(mv.importe),
+        })
+
+    por_area = defaultdict(float)
+    for mv in gastos:
+        area = mv.investment_asset_type or "Sin clasificar"
+        por_area[area] += float(mv.importe)
+    por_area_list = [{"label": k, "value": round(v, 2)} for k, v in sorted(por_area.items(), key=lambda x: -x[1])]
+
+    return jsonify({
+        "kpis": {
+            "flujo_mes_actual": round(flujo_mes, 2),
+            "meta_flujo_mensual": RD_META_INGRESO_MES,
+            "pct_flujo": round(flujo_mes / RD_META_INGRESO_MES * 100) if RD_META_INGRESO_MES else 0,
+            "cursos_mes_actual": cursos_mes,
+            "meta_cursos_mensual": RD_META_CURSOS_MES,
+            "pct_cursos": round(cursos_mes / RD_META_CURSOS_MES * 100) if RD_META_CURSOS_MES else 0,
+            "fondo_disponible": fondo,
+        },
+        "cumplimiento_mensual": cumplimiento_mensual,
+        "flujo_fondo": flujo_fondo,
+        "por_area": por_area_list,
+    })
 
 
 @app.route("/inversiones")

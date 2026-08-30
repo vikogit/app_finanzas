@@ -117,6 +117,25 @@
       </label>
     </div>
 
+    <!-- Área de capacitación: solo visible en R&D + Gasto -->
+    <div class="form-field" id="rd-training-block" style="display:none">
+      <span class="form-label">Área de capacitación</span>
+      <div id="rd-step1">
+        <span class="asset-step-hint">Paso 1 — Elige el área</span>
+        <div class="pill-group">
+          <button type="button" class="asset-btn" onclick="selectRdArea('Enseñanza &amp; Idiomas')">Enseñanza &amp; Idiomas</button>
+          <button type="button" class="asset-btn" onclick="selectRdArea('Tecnología e IA')">Tecnología e IA</button>
+          <button type="button" class="asset-btn" onclick="selectRdArea('Negocios &amp; Finanzas')">Negocios &amp; Finanzas</button>
+          <button type="button" class="asset-btn" onclick="selectRdArea('Desarrollo Creativo')">Desarrollo Creativo</button>
+        </div>
+      </div>
+      <div id="rd-step2" style="display:none">
+        <button type="button" class="asset-back" onclick="rdBackToStep1()">← Atrás</button>
+        <span class="asset-step-hint" id="rd-step2-hint">Paso 2 — Subcategoría (opcional)</span>
+        <div class="pill-group" id="rd-sub-btns"></div>
+      </div>
+    </div>
+
     <!-- Meta de días trabajados al mes: solo visible en categoría Earnings, una meta por mes -->
     <div class="form-field" id="dias-trabajo-block" style="display:none">
       <span class="form-label">Meta de días trabajados al mes</span>
@@ -243,6 +262,62 @@
     return document.querySelector('input[name="categoria"]:checked')?.value === 'R&D';
   }
 
+  function isRdGasto() {
+    const tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+    return tipo === 'Gasto' && isRdCategoria();
+  }
+
+  // ── Selector de área de capacitación (R&D + Gasto) ─────────────────────
+  const RD_SUBAREAS = {
+    'Enseñanza & Idiomas': ['Certificaciones (TEFL/TESOL/TKT/CELTA)', 'Metodología & Didáctica', 'Material Didáctico'],
+    'Tecnología e IA':     ['IA Generativa & Prompting', 'Herramientas Digitales', 'Automatización'],
+    'Negocios & Finanzas': ['Finanzas Personales e Inversión', 'Emprendimiento', 'Marketing Educativo'],
+    'Desarrollo Creativo': ['Teoría Musical & Instrumento', 'Producción & Audio'],
+  };
+
+  function selectRdArea(area) {
+    document.querySelectorAll('#rd-step1 .asset-btn').forEach(b =>
+      b.classList.toggle('active', b.textContent.trim() === area)
+    );
+    document.getElementById('investment_asset_type').value = area;
+    document.getElementById('investment_asset_name').value = '';
+    document.getElementById('rd-step1').style.display = 'none';
+    document.getElementById('rd-step2').style.display = '';
+    document.getElementById('rd-step2-hint').textContent = `Paso 2 — Subcategoría en ${area} (opcional)`;
+    document.getElementById('rd-sub-btns').innerHTML = RD_SUBAREAS[area].map(s =>
+      `<button type="button" class="asset-btn" onclick="selectRdSub('${s.replace(/'/g, "\\'")}')">${s}</button>`
+    ).join('');
+  }
+
+  function selectRdSub(sub) {
+    document.querySelectorAll('#rd-sub-btns .asset-btn').forEach(b =>
+      b.classList.toggle('active', b.textContent.trim() === sub)
+    );
+    document.getElementById('investment_asset_name').value = sub;
+  }
+
+  function rdBackToStep1() {
+    document.getElementById('rd-step1').style.display = '';
+    document.getElementById('rd-step2').style.display = 'none';
+    document.getElementById('investment_asset_type').value = '';
+    document.getElementById('investment_asset_name').value = '';
+    document.querySelectorAll('#rd-step1 .asset-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  function resetRdSelector() {
+    rdBackToStep1();
+  }
+
+  function updateRdTrainingVisibility() {
+    const block = document.getElementById('rd-training-block');
+    if (isRdGasto()) {
+      block.style.display = '';
+    } else {
+      block.style.display = 'none';
+      resetRdSelector();
+    }
+  }
+
   function isUsdEligible() {
     return isNecesidadesGasto() || isTarjetaCategoria() || isRdCategoria();
   }
@@ -367,6 +442,7 @@
     updateDiasTrabajoVisibility();
     updateUsdCheckVisibility();
     updateIngresoLabel();
+    updateRdTrainingVisibility();
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');
@@ -429,7 +505,7 @@
       desc.removeAttribute('required');
     } else {
       desc.setAttribute('required', '');
-      resetAssetSelector();
+      if (!isRdGasto()) resetAssetSelector();
     }
   }
 
@@ -545,6 +621,14 @@
         return;
       }
       return;
+    }
+    if (isRdGasto()) {
+      const area = document.getElementById('investment_asset_type').value;
+      if (!area) {
+        e.preventDefault();
+        alert('Por favor selecciona el área de capacitación (Paso 1).');
+        return;
+      }
     }
     if (!isInversionGasto()) return;
     const assetType = document.getElementById('investment_asset_type').value;
