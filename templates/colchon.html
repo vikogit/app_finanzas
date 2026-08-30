@@ -26,8 +26,8 @@
     <div class="kpi-icon" style="background:rgba(34,197,94,0.15)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
     </div>
-    <div class="kpi-label">Neto acumulado</div>
-    <div class="kpi-value" style="color:#22c55e" id="kpi-neto">S/ —</div>
+    <div class="kpi-label">Saldo actual</div>
+    <div class="kpi-value" style="color:#22c55e" id="kpi-saldo">S/ —</div>
   </div>
   <div class="card card-p">
     <div class="kpi-icon" style="background:rgba(34,197,94,0.1)">
@@ -76,7 +76,9 @@ function loadData(desde, hasta) {
     .then(r => r.json())
     .then(data => {
       const fmt = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-      document.getElementById('kpi-neto').textContent  = fmt(data.kpis.neto);
+      const kpiSaldo = document.getElementById('kpi-saldo');
+      kpiSaldo.textContent = fmt(data.kpis.saldo_actual);
+      kpiSaldo.style.color = data.kpis.saldo_actual >= 0 ? '#22c55e' : '#f87171';
       document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
       document.getElementById('kpi-movs').textContent  = data.kpis.num_movimientos;
 
@@ -95,11 +97,11 @@ function loadData(desde, hasta) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const d = getDefaultDates();
-  document.getElementById('desde').value = d.desde;
-  document.getElementById('hasta').value = d.hasta;
-  document.querySelector('[data-qf="mes"]').classList.add('active');
-  loadData(d.desde, d.hasta);
+  const hasta = localDateStr(new Date());
+  document.getElementById('desde').value = '2000-01-01';
+  document.getElementById('hasta').value = hasta;
+  document.querySelector('[data-qf="todo"]').classList.add('active');
+  loadData('2000-01-01', hasta);
 });
 </script>
 {% endblock %}

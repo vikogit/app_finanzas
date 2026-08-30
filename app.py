@@ -469,8 +469,19 @@ def api_colchon():
     for item in por_mes:
         acum += item["ingresos"] - item["gastos"]
         evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
+
+    # Saldo actual: todo el historial de Colchón, sin importar el filtro de período.
+    movs_todos = Movimiento.query.filter(Movimiento.categoria == "Colchón").all()
+    saldo_actual = round(
+        sum(float(m.importe) for m in movs_todos if m.tipo == "Ingreso") -
+        sum(float(m.importe) for m in movs_todos if m.tipo == "Gasto"), 2
+    )
+
     return jsonify({
-        "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "num_movimientos": len(movs)},
+        "kpis": {
+            "neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2),
+            "num_movimientos": len(movs), "saldo_actual": saldo_actual,
+        },
         "por_mes": por_mes, "evolucion": evol,
         "top_items": top_items(movs),
     })
