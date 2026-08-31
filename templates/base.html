@@ -670,6 +670,8 @@
     'rgba(245,158,11,0.85)',  'rgba(239,68,68,0.85)',
     'rgba(99,102,241,0.85)',  'rgba(16,185,129,0.85)',
   ];
+  const DONUT_MAX_SLICES = 5;
+  const DONUT_OTHER_COLOR = 'rgba(148,163,184,0.55)';
 
   /* ─── eToro-style area chart ─── */
   function renderEtoroChart(canvasId, labels, values, hexColor, r, g, b, yLabel) {
@@ -738,16 +740,30 @@
   function renderDonutChart(canvasId, items, centerHtml) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const dark = document.documentElement.classList.contains('dark');
-    const colors = DONUT_PALETTE.slice(0, items.length);
-    const total = items.reduce((s, i) => s + (i.value || 0), 0);
+
+    /* Cap at DONUT_MAX_SLICES real categories + "Otros" — beyond that a ring
+       becomes an unreadable sliver soup. Sort descending first so the biggest
+       slice always lands at 12 o'clock and "Otros" only ever absorbs the tail. */
+    const sorted = items.slice().sort((a, b) => (b.value || 0) - (a.value || 0));
+    let display = sorted;
+    let colors;
+    if (sorted.length > DONUT_MAX_SLICES + 1) {
+      const head = sorted.slice(0, DONUT_MAX_SLICES);
+      const restTotal = sorted.slice(DONUT_MAX_SLICES).reduce((s, i) => s + (i.value || 0), 0);
+      display = head.concat([{ label: 'Otros', value: restTotal }]);
+      colors = DONUT_PALETTE.slice(0, DONUT_MAX_SLICES).concat([DONUT_OTHER_COLOR]);
+    } else {
+      colors = DONUT_PALETTE.slice(0, display.length);
+    }
+    const total = display.reduce((s, i) => s + (i.value || 0), 0);
     const legendColor = dark ? 'rgba(255,255,255,0.6)' : '#475569';
 
     const chart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: items.map(i => i.label),
+        labels: display.map(i => i.label),
         datasets: [{
-          data: items.map(i => i.value),
+          data: display.map(i => i.value),
           backgroundColor: colors,
           borderColor: dark ? '#0a0a16' : '#ffffff',
           borderWidth: 2,
@@ -760,6 +776,7 @@
       options: {
         responsive: true, maintainAspectRatio: false,
         cutout: '74%',
+        rotation: -90,
         animation: { duration: 900, easing: 'easeOutQuart' },
         plugins: {
           legend: {
