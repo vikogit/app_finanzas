@@ -1263,57 +1263,6 @@ def api_rd():
     })
 
 
-@app.route("/inversiones")
-@login_requerido
-def inversiones_portfolio():
-    return render_template("inversiones.html", active_tab="portafolio")
-
-
-@app.route("/api/inversiones")
-@login_requerido
-def api_inversiones():
-    desde, hasta = parse_dates(request)
-    cat_tipo = request.args.get("categoria", "ETFs")
-    movs = Movimiento.query.filter(
-        Movimiento.fecha >= desde,
-        Movimiento.fecha <= hasta,
-        Movimiento.categoria == "Inversión",
-        Movimiento.tipo == "Gasto",
-        Movimiento.investment_asset_type == cat_tipo
-    ).order_by(Movimiento.fecha).all()
-
-    total = sum(float(m.importe) for m in movs)
-
-    by_asset = defaultdict(float)
-    for m in movs:
-        key = m.investment_asset_name or "Sin especificar"
-        by_asset[key] += float(m.importe)
-
-    por_mes = agrupar_mensual(movs, desde, hasta)
-    acum, evol = 0.0, []
-    for item in por_mes:
-        acum += item["gastos"]
-        evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
-
-    tabla = [{
-        "fecha": m.fecha.strftime("%Y-%m-%d"),
-        "activo": m.investment_asset_name or "—",
-        "monto": float(m.importe),
-        "notas": m.descripcion,
-    } for m in reversed(movs)]
-
-    by_asset_list = [{"label": k, "value": round(v, 2)}
-                     for k, v in sorted(by_asset.items(), key=lambda x: -x[1])]
-
-    return jsonify({
-        "total":    round(total, 2),
-        "num_ops":  len(movs),
-        "by_asset": by_asset_list if by_asset_list else [{"label": "Sin datos", "value": 1}],
-        "evolucion": evol,
-        "tabla":    tabla,
-    })
-
-
 _tc_cache = {"rate": None, "ts": 0}
 
 @app.route("/api/tipo-cambio")
