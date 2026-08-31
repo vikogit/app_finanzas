@@ -32,6 +32,8 @@
   .modal-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:4px; }
   .modal-sub { font-size:12px; color:var(--text-muted); margin-bottom:18px; }
   .modal-error { font-size:12px; color:#f87171; margin-bottom:10px; min-height:0; }
+  .modal-row { display:flex; gap:10px; }
+  .modal-row .form-field { flex:1; }
 </style>
 
 <div class="page-hdr">
@@ -132,12 +134,18 @@
 <div class="modal-overlay" id="meta-modal">
   <div class="modal-card">
     <div class="modal-title" id="meta-modal-title">Nueva meta</div>
-    <div class="modal-sub">Define cuánto deberías aportar a Inversión ese mes. Se dibuja como línea celeste sobre el gráfico.</div>
+    <div class="modal-sub" id="meta-modal-sub">Define un rango de meses y el monto de la meta — se aplicará a cada mes del rango. Se dibuja como línea celeste sobre el gráfico.</div>
     <div class="modal-error" id="meta-modal-error"></div>
     <input type="hidden" id="meta-id">
-    <div class="form-field">
-      <label class="form-label" for="meta-mes">Mes</label>
-      <input type="month" id="meta-mes" class="form-input">
+    <div class="modal-row">
+      <div class="form-field">
+        <label class="form-label" for="meta-desde">Desde</label>
+        <input type="month" id="meta-desde" class="form-input">
+      </div>
+      <div class="form-field" id="meta-hasta-wrap">
+        <label class="form-label" for="meta-hasta">Hasta</label>
+        <input type="month" id="meta-hasta" class="form-input">
+      </div>
     </div>
     <div class="form-field">
       <label class="form-label" for="meta-monto">Meta mensual (S/)</label>
@@ -242,16 +250,26 @@ function loadMetas() {
 
 function openMetaModal(meta) {
   document.getElementById('meta-modal-error').textContent = '';
+  const hastaWrap = document.getElementById('meta-hasta-wrap');
+  const sub = document.getElementById('meta-modal-sub');
   if (meta) {
     document.getElementById('meta-modal-title').textContent = 'Editar meta';
     document.getElementById('meta-id').value = meta.id;
-    document.getElementById('meta-mes').value = `${meta.year}-${String(meta.month).padStart(2,'0')}`;
+    const mesVal = `${meta.year}-${String(meta.month).padStart(2,'0')}`;
+    document.getElementById('meta-desde').value = mesVal;
+    document.getElementById('meta-hasta').value = mesVal;
     document.getElementById('meta-monto').value = meta.monto_meta;
+    hastaWrap.style.display = 'none';
+    sub.textContent = 'Edita el monto de la meta para este mes.';
   } else {
     document.getElementById('meta-modal-title').textContent = 'Nueva meta';
     document.getElementById('meta-id').value = '';
-    document.getElementById('meta-mes').value = localYearMonthStr(new Date());
+    const actual = localYearMonthStr(new Date());
+    document.getElementById('meta-desde').value = actual;
+    document.getElementById('meta-hasta').value = actual;
     document.getElementById('meta-monto').value = '';
+    hastaWrap.style.display = '';
+    sub.textContent = 'Define un rango de meses y el monto de la meta — se aplicará a cada mes del rango. Se dibuja como línea celeste sobre el gráfico.';
   }
   document.getElementById('meta-modal').classList.add('open');
 }
@@ -261,19 +279,32 @@ function closeMetaModal() {
 }
 
 function saveMeta() {
-  const id      = document.getElementById('meta-id').value;
-  const mesVal  = document.getElementById('meta-mes').value;
-  const monto   = document.getElementById('meta-monto').value;
-  const errBox  = document.getElementById('meta-modal-error');
+  const id       = document.getElementById('meta-id').value;
+  const desdeVal = document.getElementById('meta-desde').value;
+  const hastaVal = id ? desdeVal : document.getElementById('meta-hasta').value;
+  const monto    = document.getElementById('meta-monto').value;
+  const errBox   = document.getElementById('meta-modal-error');
 
-  if (!mesVal || !monto || parseFloat(monto) <= 0) {
-    errBox.textContent = 'Completa el mes y un monto mayor a 0.';
+  if (!desdeVal || !hastaVal || !monto || parseFloat(monto) <= 0) {
+    errBox.textContent = 'Completa el rango de meses y un monto mayor a 0.';
     return;
   }
-  const [year, month] = mesVal.split('-').map(Number);
-  const payload = { year, month, monto_meta: parseFloat(monto) };
-  const url    = id ? `/api/inversion/metas/${id}` : '/api/inversion/metas';
-  const method = id ? 'PUT' : 'POST';
+  if (hastaVal < desdeVal) {
+    errBox.textContent = "La fecha 'Hasta' no puede ser anterior a 'Desde'.";
+    return;
+  }
+
+  let payload, url, method;
+  if (id) {
+    const [year, month] = desdeVal.split('-').map(Number);
+    payload = { year, month, monto_meta: parseFloat(monto) };
+    url = `/api/inversion/metas/${id}`;
+    method = 'PUT';
+  } else {
+    payload = { desde: desdeVal, hasta: hastaVal, monto_meta: parseFloat(monto) };
+    url = '/api/inversion/metas';
+    method = 'POST';
+  }
 
   fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
     .then(async r => {

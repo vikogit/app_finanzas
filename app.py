@@ -155,7 +155,32 @@ def get_meta_inversion_mes(year, month):
     return float(row.monto_meta) if row else None
 
 
+def set_meta_inversion_mes(year, month, monto):
+    row = MetaInversionMes.query.filter_by(year=year, month=month).first()
+    if row:
+        row.monto_meta = monto
+    else:
+        row = MetaInversionMes(year=year, month=month, monto_meta=monto)
+        db.session.add(row)
+    db.session.commit()
+
+
 # ── helpers ──────────────────────────────────────────────────────────
+
+def iter_months(y1, m1, y2, m2):
+    y, mo = y1, m1
+    while (y, mo) <= (y2, m2):
+        yield y, mo
+        mo += 1
+        if mo > 12:
+            mo = 1
+            y += 1
+
+
+def parse_year_month(s):
+    y, m = s.split("-")
+    return int(y), int(m)
+
 
 def parse_dates(req):
     def _p(s, fallback):
@@ -637,19 +662,21 @@ def api_necesidades_metas():
     if request.method == "POST":
         data = request.get_json(force=True, silent=True) or {}
         try:
-            year  = int(data["year"])
-            month = int(data["month"])
-            monto = float(data["monto_meta"])
-            if not (1 <= month <= 12):
+            y1, m1 = parse_year_month(data["desde"])
+            y2, m2 = parse_year_month(data["hasta"])
+            monto  = float(data["monto_meta"])
+            if not (1 <= m1 <= 12 and 1 <= m2 <= 12):
                 return jsonify({"error": "Mes inválido"}), 400
+            if (y2, m2) < (y1, m1):
+                return jsonify({"error": "La fecha 'Hasta' no puede ser anterior a 'Desde'"}), 400
             if monto <= 0:
                 return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
-            existing = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
-            if existing:
-                return jsonify({"error": "Ya existe una meta para ese mes — edítala en vez de crear otra"}), 400
-            set_meta_necesidades_mes(year, month, monto)
-            row = MetaNecesidadesMes.query.filter_by(year=year, month=month).first()
-            return jsonify({"id": row.id}), 201
+            meses = list(iter_months(y1, m1, y2, m2))
+            if len(meses) > 120:
+                return jsonify({"error": "El rango no puede superar 120 meses (10 años)"}), 400
+            for y, mo in meses:
+                set_meta_necesidades_mes(y, mo, monto)
+            return jsonify({"ok": True, "count": len(meses)}), 201
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": str(e)}), 400
@@ -784,19 +811,21 @@ def api_diversion_metas():
     if request.method == "POST":
         data = request.get_json(force=True, silent=True) or {}
         try:
-            year  = int(data["year"])
-            month = int(data["month"])
-            monto = float(data["monto_meta"])
-            if not (1 <= month <= 12):
+            y1, m1 = parse_year_month(data["desde"])
+            y2, m2 = parse_year_month(data["hasta"])
+            monto  = float(data["monto_meta"])
+            if not (1 <= m1 <= 12 and 1 <= m2 <= 12):
                 return jsonify({"error": "Mes inválido"}), 400
+            if (y2, m2) < (y1, m1):
+                return jsonify({"error": "La fecha 'Hasta' no puede ser anterior a 'Desde'"}), 400
             if monto <= 0:
                 return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
-            existing = MetaDiversionMes.query.filter_by(year=year, month=month).first()
-            if existing:
-                return jsonify({"error": "Ya existe una meta para ese mes — edítala en vez de crear otra"}), 400
-            set_meta_diversion_mes(year, month, monto)
-            row = MetaDiversionMes.query.filter_by(year=year, month=month).first()
-            return jsonify({"id": row.id}), 201
+            meses = list(iter_months(y1, m1, y2, m2))
+            if len(meses) > 120:
+                return jsonify({"error": "El rango no puede superar 120 meses (10 años)"}), 400
+            for y, mo in meses:
+                set_meta_diversion_mes(y, mo, monto)
+            return jsonify({"ok": True, "count": len(meses)}), 201
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": str(e)}), 400
@@ -879,20 +908,21 @@ def api_inversion_metas():
     if request.method == "POST":
         data = request.get_json(force=True, silent=True) or {}
         try:
-            year  = int(data["year"])
-            month = int(data["month"])
-            monto = float(data["monto_meta"])
-            if not (1 <= month <= 12):
+            y1, m1 = parse_year_month(data["desde"])
+            y2, m2 = parse_year_month(data["hasta"])
+            monto  = float(data["monto_meta"])
+            if not (1 <= m1 <= 12 and 1 <= m2 <= 12):
                 return jsonify({"error": "Mes inválido"}), 400
+            if (y2, m2) < (y1, m1):
+                return jsonify({"error": "La fecha 'Hasta' no puede ser anterior a 'Desde'"}), 400
             if monto <= 0:
                 return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
-            existing = MetaInversionMes.query.filter_by(year=year, month=month).first()
-            if existing:
-                return jsonify({"error": "Ya existe una meta para ese mes — edítala en vez de crear otra"}), 400
-            row = MetaInversionMes(year=year, month=month, monto_meta=monto)
-            db.session.add(row)
-            db.session.commit()
-            return jsonify({"id": row.id}), 201
+            meses = list(iter_months(y1, m1, y2, m2))
+            if len(meses) > 120:
+                return jsonify({"error": "El rango no puede superar 120 meses (10 años)"}), 400
+            for y, mo in meses:
+                set_meta_inversion_mes(y, mo, monto)
+            return jsonify({"ok": True, "count": len(meses)}), 201
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": str(e)}), 400
