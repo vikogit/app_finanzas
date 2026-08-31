@@ -141,6 +141,20 @@ def set_meta_diversion_mes(year, month, monto):
     db.session.commit()
 
 
+class MetaInversionMes(db.Model):
+    __tablename__ = "metas_inversion_mes"
+    id         = db.Column(db.Integer, primary_key=True)
+    year       = db.Column(db.Integer, nullable=False)
+    month      = db.Column(db.Integer, nullable=False)
+    monto_meta = db.Column(db.Numeric(10, 2), nullable=False)
+    __table_args__ = (db.UniqueConstraint("year", "month", name="uq_metas_inversion_mes_year_month"),)
+
+
+def get_meta_inversion_mes(year, month):
+    row = MetaInversionMes.query.filter_by(year=year, month=month).first()
+    return float(row.monto_meta) if row else None
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def parse_dates(req):
@@ -832,18 +846,93 @@ def api_inversion():
     movs = query_movs(desde, hasta, categoria="Inversión")
     ing  = sum(float(m.importe) for m in movs if m.tipo == "Ingreso")
     gast = sum(float(m.importe) for m in movs if m.tipo == "Gasto")
-    por_mes = agrupar_mensual(movs, desde, hasta)
-    acum, evol = 0.0, []
-    for item in por_mes:
-        acum += item["gastos"]
-        evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
-    meses_activos = len([m for m in por_mes if m["ingresos"] or m["gastos"]])
+
+    bucket = defaultdict(float)
+    for m in movs:
+        if m.tipo == "Gasto":
+            bucket[(m.fecha.year, m.fecha.month)] += float(m.importe)
+
+    tendencia = []
+    y, mo = desde.year, desde.month
+    while (y, mo) <= (hasta.year, hasta.month):
+        tendencia.append({
+            "mes": date_type(y, mo, 1).strftime("%b %Y"),
+            "invertido": round(bucket.get((y, mo), 0.0), 2),
+            "meta": get_meta_inversion_mes(y, mo),
+        })
+        mo += 1
+        if mo > 12:
+            mo = 1
+            y += 1
+
+    meses_activos = len([t for t in tendencia if t["invertido"]])
     return jsonify({
         "kpis": {"neto": round(gast - ing, 2), "total_periodo": round(ing + gast, 2), "meses_activos": meses_activos},
-        "evolucion": evol,
-        "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
+        "tendencia_mensual": tendencia,
         "top_items": top_items(movs),
     })
+
+
+@app.route("/api/inversion/metas", methods=["GET", "POST"])
+@login_requerido
+def api_inversion_metas():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            year  = int(data["year"])
+            month = int(data["month"])
+            monto = float(data["monto_meta"])
+            if not (1 <= month <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
+            if monto <= 0:
+                return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+            existing = MetaInversionMes.query.filter_by(year=year, month=month).first()
+            if existing:
+                return jsonify({"error": "Ya existe una meta para ese mes — edítala en vez de crear otra"}), 400
+            row = MetaInversionMes(year=year, month=month, monto_meta=monto)
+            db.session.add(row)
+            db.session.commit()
+            return jsonify({"id": row.id}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    metas = MetaInversionMes.query.order_by(MetaInversionMes.year.desc(), MetaInversionMes.month.desc()).all()
+    return jsonify([{
+        "id": m.id, "year": m.year, "month": m.month,
+        "mes_label": f"{MESES_ES[m.month]} {m.year}",
+        "monto_meta": float(m.monto_meta),
+    } for m in metas])
+
+
+@app.route("/api/inversion/metas/<int:id>", methods=["PUT", "DELETE"])
+@login_requerido
+def api_inversion_meta_detail(id):
+    m = MetaInversionMes.query.get_or_404(id)
+
+    if request.method == "DELETE":
+        db.session.delete(m)
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        year  = int(data["year"])
+        month = int(data["month"])
+        monto = float(data["monto_meta"])
+        if not (1 <= month <= 12):
+            return jsonify({"error": "Mes inválido"}), 400
+        if monto <= 0:
+            return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+        existing = MetaInversionMes.query.filter_by(year=year, month=month).first()
+        if existing and existing.id != m.id:
+            return jsonify({"error": "Ya existe una meta para ese mes"}), 400
+        m.year, m.month, m.monto_meta = year, month, monto
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/vortex")

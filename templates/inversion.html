@@ -2,6 +2,38 @@
 {% block title %}Inversión — App Finanzas{% endblock %}
 
 {% block content %}
+<style>
+  .metas-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .btn-add-meta {
+    display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:9px;
+    font-size:12px; font-weight:600; color:#111; cursor:pointer; border:none; font-family:inherit;
+    background:linear-gradient(135deg,#facc15,#ca8a04);
+  }
+  .btn-add-meta:hover { opacity:.88; }
+  .meta-actions { display:flex; gap:6px; justify-content:flex-end; }
+  .meta-icon-btn {
+    width:26px; height:26px; border-radius:7px; border:1px solid var(--border); background:var(--input-bg);
+    color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+    transition:color .15s, background .15s;
+  }
+  .meta-icon-btn:hover { color:var(--text); background:var(--bg-card2); }
+  .meta-icon-btn.danger:hover { color:#ef4444; background:rgba(239,68,68,0.1); }
+
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:200; padding:20px;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-card {
+    background:var(--bg-card); border:1px solid var(--kpi-border); border-radius:18px;
+    padding:26px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.4);
+  }
+  html:not(.dark) .modal-card { background:#ffffff; }
+  .modal-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .modal-sub { font-size:12px; color:var(--text-muted); margin-bottom:18px; }
+  .modal-error { font-size:12px; color:#f87171; margin-bottom:10px; min-height:0; }
+</style>
+
 <div class="page-hdr">
   <h1 class="page-title">Portafolio de inversión</h1>
 </div>
@@ -47,11 +79,15 @@
 <div class="charts-grid-main">
   <div class="card card-p">
     <div class="chart-title">
-      Crecimiento acumulado del portafolio
-      <span class="chart-badge badge-yellow">Área · eToro</span>
+      Aportes mensuales de inversión
+      <span class="chart-badge badge-yellow">Barras + Meta</span>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Invertido</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Meta mensual</div>
     </div>
     <div class="chart-area-wrap">
-      <canvas id="chartArea"></canvas>
+      <canvas id="chartTendencia"></canvas>
     </div>
   </div>
   <div class="card card-p">
@@ -64,11 +100,206 @@
     </div>
   </div>
 </div>
+
+<div class="metas-hdr">
+  <h2 style="font-size:15px;font-weight:700;color:var(--text)">Metas mensuales de inversión</h2>
+  <button type="button" class="btn-add-meta" onclick="openMetaModal()">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+    Nueva meta
+  </button>
+</div>
+
+<div class="tbl-card">
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Mes</th>
+          <th style="text-align:right">Meta</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="metas-body"></tbody>
+    </table>
+    <div class="empty-state" id="metas-empty" style="display:none">
+      <p style="font-size:13px;margin-bottom:8px">Aún no has definido ninguna meta mensual.</p>
+      <a href="#" onclick="openMetaModal();return false" style="font-size:12px;font-weight:600;color:#facc15;text-decoration:none">Crear la primera →</a>
+    </div>
+  </div>
+</div>
+
+<!-- Meta modal -->
+<div class="modal-overlay" id="meta-modal">
+  <div class="modal-card">
+    <div class="modal-title" id="meta-modal-title">Nueva meta</div>
+    <div class="modal-sub">Define cuánto deberías aportar a Inversión ese mes. Se dibuja como línea celeste sobre el gráfico.</div>
+    <div class="modal-error" id="meta-modal-error"></div>
+    <input type="hidden" id="meta-id">
+    <div class="form-field">
+      <label class="form-label" for="meta-mes">Mes</label>
+      <input type="month" id="meta-mes" class="form-input">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="meta-monto">Meta mensual (S/)</label>
+      <div class="form-input-prefix">
+        <span class="form-prefix">S/</span>
+        <input type="number" id="meta-monto" step="0.01" min="0" placeholder="0.00" class="form-input">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-submit" style="background:linear-gradient(135deg,#facc15,#ca8a04)" onclick="saveMeta()">Guardar meta</button>
+      <button type="button" class="btn-cancel" onclick="closeMetaModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let chartArea = null, chartDonut = null;
+let chartTendencia = null, chartDonut = null;
+
+function fmtMoney(v) {
+  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function renderTendencia(tendencia) {
+  const ctx = document.getElementById('chartTendencia').getContext('2d');
+  const dark = document.documentElement.classList.contains('dark');
+  const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+  return new Chart(ctx, {
+    data: {
+      labels: tendencia.map(t => t.mes),
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Invertido',
+          data: tendencia.map(t => t.invertido),
+          backgroundColor: 'rgba(34,197,94,0.75)',
+          borderRadius: 4,
+        },
+        {
+          type: 'line',
+          label: 'Meta',
+          data: tendencia.map(t => t.meta),
+          borderColor: '#38bdf8',
+          borderWidth: 2,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          spanGaps: false,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: gridC }, ticks: { color: tickC, maxRotation: 0 } },
+        y: { grid: { color: gridC }, ticks: { color: tickC, callback: v => 'S/ ' + Math.abs(v).toLocaleString('es-PE') } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
+          titleColor: 'rgba(255,255,255,0.55)', bodyColor: '#f1f5f9',
+          borderColor: 'rgba(250,204,21,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
+          callbacks: { label: c => `${c.dataset.label}: ${fmtMoney(Math.abs(c.parsed.y ?? 0))}` }
+        }
+      }
+    }
+  });
+}
+
+function loadMetas() {
+  fetch('/api/inversion/metas')
+    .then(r => r.json())
+    .then(metas => {
+      const tbody = document.getElementById('metas-body');
+      const empty = document.getElementById('metas-empty');
+      tbody.innerHTML = '';
+      if (!metas.length) { empty.style.display = 'block'; return; }
+      empty.style.display = 'none';
+      metas.forEach(m => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="muted">${m.mes_label}</td>
+          <td class="right" style="font-weight:700;color:#facc15">${fmtMoney(m.monto_meta)}</td>
+          <td class="right">
+            <div class="meta-actions">
+              <button class="meta-icon-btn" title="Editar" onclick='openMetaModal(${JSON.stringify(m)})'>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+              </button>
+              <button class="meta-icon-btn danger" title="Eliminar" onclick="deleteMeta(${m.id})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9M4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M6.31 5.393c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m3.09 0a48.667 48.667 0 013.478.397"/></svg>
+              </button>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    });
+}
+
+function openMetaModal(meta) {
+  document.getElementById('meta-modal-error').textContent = '';
+  if (meta) {
+    document.getElementById('meta-modal-title').textContent = 'Editar meta';
+    document.getElementById('meta-id').value = meta.id;
+    document.getElementById('meta-mes').value = `${meta.year}-${String(meta.month).padStart(2,'0')}`;
+    document.getElementById('meta-monto').value = meta.monto_meta;
+  } else {
+    document.getElementById('meta-modal-title').textContent = 'Nueva meta';
+    document.getElementById('meta-id').value = '';
+    document.getElementById('meta-mes').value = localYearMonthStr(new Date());
+    document.getElementById('meta-monto').value = '';
+  }
+  document.getElementById('meta-modal').classList.add('open');
+}
+
+function closeMetaModal() {
+  document.getElementById('meta-modal').classList.remove('open');
+}
+
+function saveMeta() {
+  const id      = document.getElementById('meta-id').value;
+  const mesVal  = document.getElementById('meta-mes').value;
+  const monto   = document.getElementById('meta-monto').value;
+  const errBox  = document.getElementById('meta-modal-error');
+
+  if (!mesVal || !monto || parseFloat(monto) <= 0) {
+    errBox.textContent = 'Completa el mes y un monto mayor a 0.';
+    return;
+  }
+  const [year, month] = mesVal.split('-').map(Number);
+  const payload = { year, month, monto_meta: parseFloat(monto) };
+  const url    = id ? `/api/inversion/metas/${id}` : '/api/inversion/metas';
+  const method = id ? 'PUT' : 'POST';
+
+  fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+    .then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error al guardar la meta');
+      closeMetaModal();
+      loadMetas();
+      const d = getCurrentRange();
+      loadData(d.desde, d.hasta);
+    })
+    .catch(e => { errBox.textContent = e.message; });
+}
+
+function deleteMeta(id) {
+  if (!confirm('¿Seguro que deseas eliminar esta meta?')) return;
+  fetch(`/api/inversion/metas/${id}`, { method: 'DELETE' })
+    .then(() => {
+      loadMetas();
+      const d = getCurrentRange();
+      loadData(d.desde, d.hasta);
+    });
+}
+
+function getCurrentRange() {
+  return { desde: document.getElementById('desde').value, hasta: document.getElementById('hasta').value };
+}
 
 function loadData(desde, hasta) {
   fetch(`/api/inversion?desde=${desde}&hasta=${hasta}`)
@@ -79,16 +310,16 @@ function loadData(desde, hasta) {
       document.getElementById('kpi-total').textContent = fmt(data.kpis.total_periodo);
       document.getElementById('kpi-meses').textContent = data.kpis.meses_activos;
 
-      if (chartArea)  { chartArea.destroy();  window._charts = window._charts.filter(c=>c!==chartArea);  }
-      if (chartDonut) { chartDonut.destroy(); window._charts = window._charts.filter(c=>c!==chartDonut); }
+      if (chartTendencia) { chartTendencia.destroy(); window._charts = window._charts.filter(c=>c!==chartTendencia); }
+      if (chartDonut)     { chartDonut.destroy();     window._charts = window._charts.filter(c=>c!==chartDonut);     }
 
       const center = `<div class="donut-center-val" style="color:#facc15">${fmt(data.kpis.neto)}</div>
                       <div class="donut-center-lbl">Neto</div>`;
 
-      chartArea  = renderEtoroChart('chartArea', data.evolucion.map(d=>d.mes), data.evolucion.map(d=>d.acumulado), '#facc15', 250, 204, 21);
+      chartTendencia = renderTendencia(data.tendencia_mensual);
       chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
 
-      window._charts.push(chartArea, chartDonut);
+      window._charts.push(chartTendencia, chartDonut);
     });
 }
 
@@ -98,6 +329,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('desde').value = d.desde;
   document.getElementById('hasta').value = d.hasta;
   loadData(d.desde, d.hasta);
+  loadMetas();
+
+  document.getElementById('meta-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'meta-modal') closeMetaModal();
+  });
 });
 </script>
 {% endblock %}
