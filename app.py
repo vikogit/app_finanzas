@@ -165,6 +165,30 @@ def set_meta_inversion_mes(year, month, monto):
     db.session.commit()
 
 
+class MetaRdMes(db.Model):
+    __tablename__ = "metas_rd_mes"
+    id         = db.Column(db.Integer, primary_key=True)
+    year       = db.Column(db.Integer, nullable=False)
+    month      = db.Column(db.Integer, nullable=False)
+    monto_meta = db.Column(db.Numeric(10, 2), nullable=False)
+    __table_args__ = (db.UniqueConstraint("year", "month", name="uq_metas_rd_mes_year_month"),)
+
+
+def get_meta_rd_mes(year, month):
+    row = MetaRdMes.query.filter_by(year=year, month=month).first()
+    return float(row.monto_meta) if row else None
+
+
+def set_meta_rd_mes(year, month, monto):
+    row = MetaRdMes.query.filter_by(year=year, month=month).first()
+    if row:
+        row.monto_meta = monto
+    else:
+        row = MetaRdMes(year=year, month=month, monto_meta=monto)
+        db.session.add(row)
+    db.session.commit()
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def iter_months(y1, m1, y2, m2):
@@ -1304,7 +1328,6 @@ def api_tarjeta_pago_delete(id):
 
 
 # ── Research & Development (R&D) ───────────────────────────────────────
-RD_META_INGRESO_MES = 150.0
 RD_META_CURSOS_MES = 1
 RD_AREAS = ["Enseñanza & Idiomas", "Tecnología e IA", "Negocios & Finanzas", "Desarrollo Creativo"]
 RD_SUBAREAS = {
@@ -1319,6 +1342,11 @@ RD_SUBAREAS = {
 @login_requerido
 def api_rd():
     hoy = hoy_local()
+    desde, hasta = parse_dates(request)
+    if (hasta.year - desde.year) * 12 + (hasta.month - desde.month) > 120:
+        y, m = _add_months(hasta.year, hasta.month, -120)
+        desde = date_type(y, m, 1)
+
     movs = Movimiento.query.filter(Movimiento.categoria == "R&D").order_by(Movimiento.fecha).all()
     ingresos = [m for m in movs if m.tipo == "Ingreso"]
     gastos   = [m for m in movs if m.tipo == "Gasto"]
@@ -1326,14 +1354,10 @@ def api_rd():
     flujo_mes  = sum(float(m.importe) for m in ingresos if m.fecha.year == hoy.year and m.fecha.month == hoy.month)
     cursos_mes = sum(1 for m in gastos if m.fecha.year == hoy.year and m.fecha.month == hoy.month)
     fondo = round(sum(float(m.importe) for m in ingresos) - sum(float(m.importe) for m in gastos), 2)
+    meta_mes_actual = get_meta_rd_mes(hoy.year, hoy.month)
 
-    # Cumplimiento mensual: últimos 12 meses (ventana móvil, terminando en el mes actual)
-    ventana = []
-    y, m = hoy.year, hoy.month
-    for _ in range(12):
-        ventana.append((y, m))
-        y, m = _add_months(y, m, -1)
-    ventana.reverse()
+    # Cumplimiento mensual: los meses dentro del período filtrado
+    ventana = list(iter_months(desde.year, desde.month, hasta.year, hasta.month))
 
     ingresos_por_mes = defaultdict(float)
     cursos_por_mes = defaultdict(int)
@@ -1345,11 +1369,12 @@ def api_rd():
     cumplimiento_mensual = {
         "meses": [f"{MESES_ES[mm][:3]} {yy}" for yy, mm in ventana],
         "ingresos": [round(ingresos_por_mes.get(k, 0.0), 2) for k in ventana],
-        "meta": RD_META_INGRESO_MES,
+        "meta": [get_meta_rd_mes(yy, mm) for yy, mm in ventana],
         "curso_comprado": [cursos_por_mes.get(k, 0) >= RD_META_CURSOS_MES for k in ventana],
     }
 
-    # Flujo del fondo: saldo acumulado en el instante exacto de cada transacción
+    # Flujo del fondo: saldo acumulado en el instante exacto de cada transacción,
+    # histórico completo — no se filtra por período, es el saldo real del fondo.
     flujo_fondo = []
     saldo = 0.0
     for mv in movs:
@@ -1362,15 +1387,16 @@ def api_rd():
 
     por_area = defaultdict(float)
     for mv in gastos:
-        area = mv.investment_asset_type or "Sin clasificar"
-        por_area[area] += float(mv.importe)
+        if desde <= mv.fecha <= hasta:
+            area = mv.investment_asset_type or "Sin clasificar"
+            por_area[area] += float(mv.importe)
     por_area_list = [{"label": k, "value": round(v, 2)} for k, v in sorted(por_area.items(), key=lambda x: -x[1])]
 
     return jsonify({
         "kpis": {
             "flujo_mes_actual": round(flujo_mes, 2),
-            "meta_flujo_mensual": RD_META_INGRESO_MES,
-            "pct_flujo": round(flujo_mes / RD_META_INGRESO_MES * 100) if RD_META_INGRESO_MES else 0,
+            "meta_flujo_mensual": meta_mes_actual,
+            "pct_flujo": round(flujo_mes / meta_mes_actual * 100) if meta_mes_actual else None,
             "cursos_mes_actual": cursos_mes,
             "meta_cursos_mensual": RD_META_CURSOS_MES,
             "pct_cursos": round(cursos_mes / RD_META_CURSOS_MES * 100) if RD_META_CURSOS_MES else 0,
@@ -1380,6 +1406,69 @@ def api_rd():
         "flujo_fondo": flujo_fondo,
         "por_area": por_area_list,
     })
+
+
+@app.route("/api/rd/metas", methods=["GET", "POST"])
+@login_requerido
+def api_rd_metas():
+    if request.method == "POST":
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            y1, m1 = parse_year_month(data["desde"])
+            y2, m2 = parse_year_month(data["hasta"])
+            monto  = float(data["monto_meta"])
+            if not (1 <= m1 <= 12 and 1 <= m2 <= 12):
+                return jsonify({"error": "Mes inválido"}), 400
+            if (y2, m2) < (y1, m1):
+                return jsonify({"error": "La fecha 'Hasta' no puede ser anterior a 'Desde'"}), 400
+            if monto <= 0:
+                return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+            meses = list(iter_months(y1, m1, y2, m2))
+            if len(meses) > 120:
+                return jsonify({"error": "El rango no puede superar 120 meses (10 años)"}), 400
+            for y, mo in meses:
+                set_meta_rd_mes(y, mo, monto)
+            return jsonify({"ok": True, "count": len(meses)}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+
+    metas = MetaRdMes.query.order_by(MetaRdMes.year.desc(), MetaRdMes.month.desc()).all()
+    return jsonify([{
+        "id": m.id, "year": m.year, "month": m.month,
+        "mes_label": f"{MESES_ES[m.month]} {m.year}",
+        "monto_meta": float(m.monto_meta),
+    } for m in metas])
+
+
+@app.route("/api/rd/metas/<int:id>", methods=["PUT", "DELETE"])
+@login_requerido
+def api_rd_meta_detail(id):
+    m = MetaRdMes.query.get_or_404(id)
+
+    if request.method == "DELETE":
+        db.session.delete(m)
+        db.session.commit()
+        return jsonify({"ok": True})
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        year  = int(data["year"])
+        month = int(data["month"])
+        monto = float(data["monto_meta"])
+        if not (1 <= month <= 12):
+            return jsonify({"error": "Mes inválido"}), 400
+        if monto <= 0:
+            return jsonify({"error": "Ingresa un monto mayor a 0"}), 400
+        existing = MetaRdMes.query.filter_by(year=year, month=month).first()
+        if existing and existing.id != m.id:
+            return jsonify({"error": "Ya existe una meta para ese mes"}), 400
+        m.year, m.month, m.monto_meta = year, month, monto
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
 
 _tc_cache = {"rate": None, "ts": 0}
