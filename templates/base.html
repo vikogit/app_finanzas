@@ -352,14 +352,20 @@
     .charts-grid-main { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; margin-bottom: 20px; }
     .chart-area-wrap  { position: relative; height: 260px; }
     .chart-donut-wrap { position: relative; height: 260px; }
+    .chart-donut-wrap canvas {
+      filter: drop-shadow(0 10px 22px rgba(0,0,0,0.35));
+    }
+    html:not(.dark) .chart-donut-wrap canvas {
+      filter: drop-shadow(0 8px 16px rgba(15,23,42,0.14));
+    }
 
     /* Center label inside donut */
     .donut-center {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
       text-align: center; pointer-events: none; line-height: 1.2;
     }
-    .donut-center-val  { font-size: 18px; font-weight: 800; color: var(--text); }
-    .donut-center-lbl  { font-size: 9px;  font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .donut-center-val  { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
+    .donut-center-lbl  { font-size: 9px;  font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
 
     /* ─── Table (movimientos) ─── */
     .tbl-card { background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px; overflow: hidden; backdrop-filter: blur(10px); }
@@ -733,6 +739,8 @@
     const ctx = document.getElementById(canvasId).getContext('2d');
     const dark = document.documentElement.classList.contains('dark');
     const colors = DONUT_PALETTE.slice(0, items.length);
+    const total = items.reduce((s, i) => s + (i.value || 0), 0);
+    const legendColor = dark ? 'rgba(255,255,255,0.6)' : '#475569';
 
     const chart = new Chart(ctx, {
       type: 'doughnut',
@@ -741,31 +749,52 @@
         datasets: [{
           data: items.map(i => i.value),
           backgroundColor: colors,
-          borderColor: dark ? '#060610' : '#ffffff',
-          borderWidth: 3,
-          hoverOffset: 10,
+          borderColor: dark ? '#0a0a16' : '#ffffff',
+          borderWidth: 2,
+          borderRadius: 8,
+          spacing: 3,
+          hoverOffset: 14,
+          hoverBorderWidth: 3,
         }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        cutout: '65%',
+        cutout: '74%',
+        animation: { duration: 900, easing: 'easeOutQuart' },
         plugins: {
           legend: {
             position: 'bottom',
             labels: {
-              color: dark ? 'rgba(255,255,255,0.48)' : '#64748b',
-              font: { size: 10 }, boxWidth: 8, padding: 12,
-              usePointStyle: true, pointStyleWidth: 8,
+              color: legendColor,
+              font: { size: 10, weight: '600' }, boxWidth: 8, boxHeight: 8, padding: 14,
+              usePointStyle: true, pointStyle: 'circle', pointStyleWidth: 8,
+              generateLabels: chart => {
+                const data = chart.data.datasets[0].data;
+                return chart.data.labels.map((label, i) => ({
+                  text: `${label}   ${total ? Math.round(data[i] / total * 100) : 0}%`,
+                  fillStyle: colors[i],
+                  strokeStyle: colors[i],
+                  fontColor: legendColor,
+                  pointStyle: 'circle',
+                  hidden: !chart.getDataVisibility(i),
+                  index: i,
+                }));
+              }
             }
           },
           tooltip: {
-            backgroundColor: dark ? 'rgba(6,6,16,0.94)' : 'rgba(15,23,42,0.92)',
-            titleColor: 'rgba(255,255,255,0.45)',
+            backgroundColor: dark ? 'rgba(6,6,16,0.95)' : 'rgba(15,23,42,0.94)',
+            titleColor: '#f1f5f9',
+            titleFont: { weight: '700' },
             bodyColor: '#f1f5f9',
-            borderColor: 'rgba(255,255,255,0.12)',
+            borderColor: 'rgba(255,255,255,0.14)',
             borderWidth: 1, padding: 12, cornerRadius: 10,
+            usePointStyle: true,
             callbacks: {
-              label: c => ' S/ ' + c.raw.toLocaleString('es-PE', {minimumFractionDigits:2})
+              label: c => {
+                const pct = total ? Math.round(c.raw / total * 100) : 0;
+                return ` S/ ${c.raw.toLocaleString('es-PE', {minimumFractionDigits:2})}  ·  ${pct}%`;
+              }
             }
           }
         }
