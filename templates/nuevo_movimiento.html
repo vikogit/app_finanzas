@@ -52,7 +52,7 @@
           <input type="radio" id="gasto" name="tipo" value="Gasto" checked>
           <label for="gasto">Gasto</label>
         </div>
-        <div class="pill-radio">
+        <div class="pill-radio" id="ingreso-wrap">
           <input type="radio" id="ingreso" name="tipo" value="Ingreso">
           <label for="ingreso" id="ingreso-label">Ingreso</label>
         </div>
@@ -288,6 +288,20 @@
   // Necesidades solo admite dólares en Gasto; Tarjeta los admite tanto al
   // gastar (consumo en USD) como al pagar (repago en USD), ya que la
   // tarjeta permite ambas monedas en las dos direcciones.
+  function isInversionCategoria() {
+    return document.querySelector('input[name="categoria"]:checked')?.value === 'Inversión';
+  }
+
+  function updateInversionTipoVisibility() {
+    const wrap = document.getElementById('ingreso-wrap');
+    if (isInversionCategoria()) {
+      wrap.style.display = 'none';
+      document.getElementById('gasto').checked = true;
+    } else {
+      wrap.style.display = '';
+    }
+  }
+
   function isRdCategoria() {
     return document.querySelector('input[name="categoria"]:checked')?.value === 'R&D';
   }
@@ -597,6 +611,7 @@
     updateUsdCheckVisibility();
     updateIngresoLabel();
     updateRdTrainingVisibility();
+    updateInversionTipoVisibility();
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');

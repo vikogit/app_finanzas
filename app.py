@@ -839,7 +839,7 @@ def api_inversion():
         evol.append({"mes": item["mes"], "acumulado": round(acum, 2)})
     meses_activos = len([m for m in por_mes if m["ingresos"] or m["gastos"]])
     return jsonify({
-        "kpis": {"neto": round(ing - gast, 2), "total_periodo": round(ing + gast, 2), "meses_activos": meses_activos},
+        "kpis": {"neto": round(gast - ing, 2), "total_periodo": round(ing + gast, 2), "meses_activos": meses_activos},
         "evolucion": evol,
         "aportes_mensuales": [{"mes": i["mes"], "monto": round(i["gastos"], 2)} for i in por_mes],
         "top_items": top_items(movs),
