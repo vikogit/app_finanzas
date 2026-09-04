@@ -4,7 +4,7 @@
 {% block content %}
 <style>
   /* ─── Resultados panel ─── */
-  .resultados-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 22px; }
+  .resultados-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-bottom: 22px; }
   .resultado-card {
     background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px;
     padding: 18px 20px; backdrop-filter: blur(10px); position: relative; overflow: hidden;
@@ -109,12 +109,6 @@
     <div class="resultado-val" id="res-ahorro">— %</div>
     <div class="resultado-meta">Meta recomendada: 10–20%</div>
     <div class="resultado-badge" id="res-ahorro-badge"><span class="dot"></span><span id="res-ahorro-badge-txt">—</span></div>
-  </div>
-  <div class="resultado-card">
-    <div class="resultado-label">Capacidad de endeudamiento</div>
-    <div class="resultado-val" id="res-deuda-pct">— %</div>
-    <div class="resultado-meta">Límite saludable: hasta 30–35%</div>
-    <div class="resultado-badge" id="res-deuda-badge"><span class="dot"></span><span id="res-deuda-badge-txt">—</span></div>
   </div>
 </div>
 
@@ -278,18 +272,6 @@ function renderResultados(payload) {
     else                                   badgeFor(ahorroBadge, ahorroBadgeTxt, 'ok',   'Dentro de la meta');
   }
 
-  const deudaEl = document.getElementById('res-deuda-pct');
-  const deudaBadge = document.getElementById('res-deuda-badge');
-  const deudaBadgeTxt = document.getElementById('res-deuda-badge-txt');
-  if (r.capacidad_endeudamiento_pct === null) {
-    deudaEl.textContent = '— %';
-    badgeFor(deudaBadge, deudaBadgeTxt, 'warn', 'Sin ingresos registrados');
-  } else {
-    deudaEl.textContent = r.capacidad_endeudamiento_pct + ' %';
-    if (r.capacidad_endeudamiento_pct <= 30)      badgeFor(deudaBadge, deudaBadgeTxt, 'ok',   'Nivel saludable');
-    else if (r.capacidad_endeudamiento_pct <= 35) badgeFor(deudaBadge, deudaBadgeTxt, 'warn', 'Cerca del límite');
-    else                                            badgeFor(deudaBadge, deudaBadgeTxt, 'bad',  'Por encima del límite');
-  }
 }
 
 function renderAll(payload) {
