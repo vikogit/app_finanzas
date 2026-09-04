@@ -68,8 +68,8 @@
           <th class="th-filter {{ 'active' if categoria }}">
             <span class="th-label" onclick="toggleColFilter('categoria', event)" ondblclick="clearColFilter('categoria', event)">Categoría <span class="caret">▾</span></span>
             <div class="col-filter-dropdown" id="dropdown-categoria" style="display:none" onclick="event.stopPropagation()">
-              {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings'] %}
-              <div class="col-filter-opt" onclick="setColFilter('categoria','{{ cat }}')">{{ cat }}</div>
+              {% for cat in ['Colchón', 'Necesidades', 'Diversión', 'Inversión', 'VORTEX', 'Earnings', 'Tarjeta', 'R&D'] %}
+              <div class="col-filter-opt" onclick="setColFilter('categoria','{{ cat }}')">{{ 'R & D' if cat == 'R&D' else cat }}</div>
               {% endfor %}
             </div>
           </th>
