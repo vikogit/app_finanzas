@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block title %}Presupuesto Personal — App Finanzas{% endblock %}
+
+{% block content %}
+<style>
+  /* ─── Resultados panel ─── */
+  .resultados-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 22px; }
+  .resultado-card {
+    background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px;
+    padding: 18px 20px; backdrop-filter: blur(10px); position: relative; overflow: hidden;
+  }
+  .resultado-card::before {
+    content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  }
+  .resultado-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-muted); margin-bottom: 8px;
+  }
+  .resultado-val { font-size: 26px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.1; }
+  .resultado-meta { font-size: 11px; color: var(--text-subtle); margin-top: 6px; }
+  .resultado-badge {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+    padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700;
+  }
+  .resultado-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge-green  { background: rgba(34,197,94,0.14);  color: #4ade80; }
+  .badge-green  .dot { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.6); }
+  .badge-amber  { background: rgba(245,158,11,0.14); color: #fbbf24; }
+  .badge-amber  .dot { background: #fbbf24; box-shadow: 0 0 6px rgba(251,191,36,0.6); }
+  .badge-red    { background: rgba(239,68,68,0.14);  color: #f87171; }
+  .badge-red    .dot { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.6); }
+
+  /* ─── Category cards ─── */
+  .presu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .presu-card {
+    background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px;
+    padding: 18px 20px; backdrop-filter: blur(10px);
+  }
+  .presu-card-hdr { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .presu-icon {
+    width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .presu-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .presu-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .presu-sub-val { font-weight: 700; }
+
+  .presu-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .presu-row { display: flex; align-items: center; gap: 8px; }
+  .presu-input-nombre {
+    flex: 1; min-width: 0; background: var(--input-bg); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 12px; font-size: 13px; color: var(--text);
+    font-family: inherit; transition: border-color .15s;
+  }
+  .presu-input-nombre:focus { border-color: #3b82f6; outline: none; }
+  .presu-amount-wrap { position: relative; flex: 0 0 118px; }
+  .presu-amount-wrap .presu-prefix {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    font-size: 12px; color: var(--text-muted); pointer-events: none;
+  }
+  .presu-input-monto {
+    width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 10px 9px 30px; font-size: 13px; color: var(--text);
+    font-family: inherit; transition: border-color .15s;
+  }
+  .presu-input-monto:focus { border-color: #3b82f6; outline: none; }
+  .presu-del-btn {
+    width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--input-bg); color: var(--text-muted); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; transition: color .15s, background .15s;
+  }
+  .presu-del-btn:hover { color: #f87171; background: rgba(239,68,68,0.1); }
+
+  .presu-empty { font-size: 12px; color: var(--text-subtle); padding: 8px 2px 4px; }
+
+  .presu-add-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+    padding: 9px; border-radius: 9px; border: 1px dashed var(--border); background: transparent;
+    color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .presu-add-btn:hover { color: var(--text); border-color: #3b82f6; background: rgba(59,130,246,0.06); }
+
+  .presu-deuda-wrap { margin-top: 16px; }
+
+  @media (max-width: 900px) {
+    .presu-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .resultados-grid { grid-template-columns: 1fr; }
+    .presu-amount-wrap { flex: 0 0 100px; }
+  }
+</style>
+
+<div class="page-hdr">
+  <h1 class="page-title">Presupuesto Personal</h1>
+  <p class="page-sub">Ingresos, gastos y deudas mensuales — editable en cualquier momento</p>
+</div>
+
+<div class="resultados-grid">
+  <div class="resultado-card">
+    <div class="resultado-label">Saldo disponible</div>
+    <div class="resultado-val" id="res-saldo">S/ —</div>
+    <div class="resultado-meta">Ingresos totales − gastos totales</div>
+  </div>
+  <div class="resultado-card">
+    <div class="resultado-label">Capacidad de ahorro</div>
+    <div class="resultado-val" id="res-ahorro">— %</div>
+    <div class="resultado-meta">Meta recomendada: 10–20%</div>
+    <div class="resultado-badge" id="res-ahorro-badge"><span class="dot"></span><span id="res-ahorro-badge-txt">—</span></div>
+  </div>
+  <div class="resultado-card">
+    <div class="resultado-label">Capacidad de endeudamiento</div>
+    <div class="resultado-val" id="res-deuda-pct">— %</div>
+    <div class="resultado-meta">Límite saludable: hasta 30–35%</div>
+    <div class="resultado-badge" id="res-deuda-badge"><span class="dot"></span><span id="res-deuda-badge-txt">—</span></div>
+  </div>
+</div>
+
+<div class="presu-grid">
+  <div class="presu-card">
+    <div class="presu-card-hdr">
+      <div class="presu-icon" style="background:rgba(34,197,94,0.15)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+      </div>
+      <div>
+        <div class="presu-title">Ingresos fijos</div>
+        <div class="presu-sub">Subtotal: <span class="presu-sub-val" id="sub-ingreso_fijo" style="color:#4ade80">S/ 0.00</span></div>
+      </div>
+    </div>
+    <div class="presu-rows" id="rows-ingreso_fijo"></div>
+    <button type="button" class="presu-add-btn" onclick="addItem('ingreso_fijo')">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Agregar
+    </button>
+  </div>
+
+  <div class="presu-card">
+    <div class="presu-card-hdr">
+      <div class="presu-icon" style="background:rgba(16,185,129,0.15)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+      </div>
+      <div>
+        <div class="presu-title">Ingresos variables</div>
+        <div class="presu-sub">Subtotal: <span class="presu-sub-val" id="sub-ingreso_variable" style="color:#34d399">S/ 0.00</span></div>
+      </div>
+    </div>
+    <div class="presu-rows" id="rows-ingreso_variable"></div>
+    <button type="button" class="presu-add-btn" onclick="addItem('ingreso_variable')">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Agregar
+    </button>
+  </div>
+
+  <div class="presu-card">
+    <div class="presu-card-hdr">
+      <div class="presu-icon" style="background:rgba(239,68,68,0.15)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21"/></svg>
+      </div>
+      <div>
+        <div class="presu-title">Gastos fijos</div>
+        <div class="presu-sub">Subtotal: <span class="presu-sub-val" id="sub-gasto_fijo" style="color:#f87171">S/ 0.00</span></div>
+      </div>
+    </div>
+    <div class="presu-rows" id="rows-gasto_fijo"></div>
+    <button type="button" class="presu-add-btn" onclick="addItem('gasto_fijo')">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Agregar
+    </button>
+  </div>
+
+  <div class="presu-card">
+    <div class="presu-card-hdr">
+      <div class="presu-icon" style="background:rgba(244,63,94,0.15)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
+      </div>
+      <div>
+        <div class="presu-title">Gastos variables</div>
+        <div class="presu-sub">Subtotal: <span class="presu-sub-val" id="sub-gasto_variable" style="color:#fb7185">S/ 0.00</span></div>
+      </div>
+    </div>
+    <div class="presu-rows" id="rows-gasto_variable"></div>
+    <button type="button" class="presu-add-btn" onclick="addItem('gasto_variable')">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Agregar
+    </button>
+  </div>
+</div>
+
+<div class="presu-deuda-wrap">
+  <div class="presu-card" style="max-width:100%">
+    <div class="presu-card-hdr">
+      <div class="presu-icon" style="background:rgba(59,130,246,0.15)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-9-13.5h16.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-9a1.5 1.5 0 011.5-1.5z"/></svg>
+      </div>
+      <div>
+        <div class="presu-title">Deudas (cuotas mensuales)</div>
+        <div class="presu-sub">Subtotal: <span class="presu-sub-val" id="sub-deuda" style="color:#60a5fa">S/ 0.00</span></div>
+      </div>
+    </div>
+    <div class="presu-rows" id="rows-deuda"></div>
+    <button type="button" class="presu-add-btn" onclick="addItem('deuda')">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Agregar deuda
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PRESU_CATEGORIAS = ['ingreso_fijo', 'ingreso_variable', 'gasto_fijo', 'gasto_variable', 'deuda'];
+const PRESU_SUB_COLOR = {
+  ingreso_fijo: '#4ade80', ingreso_variable: '#34d399',
+  gasto_fijo: '#f87171', gasto_variable: '#fb7185', deuda: '#60a5fa',
+};
+
+function fmtMoney(v) {
+  return 'S/ ' + Number(v).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function rowHtml(categoria, item) {
+  return `
+    <div class="presu-row" data-id="${item.id}">
+      <input type="text" class="presu-input-nombre" value="${item.nombre.replace(/"/g,'&quot;')}"
+             placeholder="Concepto" onblur="saveItem(${item.id}, this)" onkeydown="if(event.key==='Enter')this.blur()">
+      <div class="presu-amount-wrap">
+        <span class="presu-prefix">S/</span>
+        <input type="number" class="presu-input-monto" value="${item.monto}" step="0.01" min="0"
+               onblur="saveItem(${item.id}, this)" onkeydown="if(event.key==='Enter')this.blur()">
+      </div>
+      <button type="button" class="presu-del-btn" title="Eliminar" onclick="deleteItem(${item.id})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9M4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M6.31 5.393c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m3.09 0a48.667 48.667 0 013.478.397"/></svg>
+      </button>
+    </div>`;
+}
+
+function renderRows(payload) {
+  PRESU_CATEGORIAS.forEach(cat => {
+    const wrap = document.getElementById(`rows-${cat}`);
+    const items = payload.items[cat] || [];
+    wrap.innerHTML = items.length
+      ? items.map(it => rowHtml(cat, it)).join('')
+      : `<div class="presu-empty">Sin ítems todavía.</div>`;
+  });
+}
+
+function badgeFor(el, txtEl, level, text) {
+  el.classList.remove('badge-green', 'badge-amber', 'badge-red');
+  el.classList.add(level === 'ok' ? 'badge-green' : level === 'warn' ? 'badge-amber' : 'badge-red');
+  txtEl.textContent = text;
+}
+
+function renderResultados(payload) {
+  const r = payload.resultados;
+  const t = payload.totales;
+
+  PRESU_CATEGORIAS.forEach(cat => {
+    const el = document.getElementById(`sub-${cat}`);
+    if (el) el.textContent = fmtMoney(t[cat] || 0);
+  });
+
+  const saldoEl = document.getElementById('res-saldo');
+  saldoEl.textContent = fmtMoney(r.saldo_disponible);
+  saldoEl.style.color = r.saldo_disponible >= 0 ? '#4ade80' : '#f87171';
+
+  const ahorroEl = document.getElementById('res-ahorro');
+  const ahorroBadge = document.getElementById('res-ahorro-badge');
+  const ahorroBadgeTxt = document.getElementById('res-ahorro-badge-txt');
+  if (r.capacidad_ahorro_pct === null) {
+    ahorroEl.textContent = '— %';
+    badgeFor(ahorroBadge, ahorroBadgeTxt, 'warn', 'Sin ingresos registrados');
+  } else {
+    ahorroEl.textContent = r.capacidad_ahorro_pct + ' %';
+    if (r.capacidad_ahorro_pct < 0)       badgeFor(ahorroBadge, ahorroBadgeTxt, 'bad',  'Estás en déficit');
+    else if (r.capacidad_ahorro_pct < 10) badgeFor(ahorroBadge, ahorroBadgeTxt, 'warn', 'Por debajo de la meta');
+    else                                   badgeFor(ahorroBadge, ahorroBadgeTxt, 'ok',   'Dentro de la meta');
+  }
+
+  const deudaEl = document.getElementById('res-deuda-pct');
+  const deudaBadge = document.getElementById('res-deuda-badge');
+  const deudaBadgeTxt = document.getElementById('res-deuda-badge-txt');
+  if (r.capacidad_endeudamiento_pct === null) {
+    deudaEl.textContent = '— %';
+    badgeFor(deudaBadge, deudaBadgeTxt, 'warn', 'Sin ingresos registrados');
+  } else {
+    deudaEl.textContent = r.capacidad_endeudamiento_pct + ' %';
+    if (r.capacidad_endeudamiento_pct <= 30)      badgeFor(deudaBadge, deudaBadgeTxt, 'ok',   'Nivel saludable');
+    else if (r.capacidad_endeudamiento_pct <= 35) badgeFor(deudaBadge, deudaBadgeTxt, 'warn', 'Cerca del límite');
+    else                                            badgeFor(deudaBadge, deudaBadgeTxt, 'bad',  'Por encima del límite');
+  }
+}
+
+function renderAll(payload) {
+  renderRows(payload);
+  renderResultados(payload);
+}
+
+function loadPresupuesto() {
+  fetch('/api/presupuesto').then(r => r.json()).then(renderAll);
+}
+
+function addItem(categoria) {
+  fetch('/api/presupuesto/items', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ categoria, nombre: 'Nuevo ítem', monto: 0 }),
+  })
+    .then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error al crear el ítem');
+      renderAll(data);
+      const wrap = document.getElementById(`rows-${categoria}`);
+      const firstInput = wrap.querySelector('.presu-row:last-child .presu-input-nombre');
+      if (firstInput) { firstInput.focus(); firstInput.select(); }
+    })
+    .catch(e => alert(e.message));
+}
+
+function saveItem(id, el) {
+  const row = el.closest('.presu-row');
+  const nombre = row.querySelector('.presu-input-nombre').value.trim();
+  const monto = parseFloat(row.querySelector('.presu-input-monto').value);
+
+  if (!nombre || isNaN(monto) || monto < 0) {
+    alert('Ingresa un nombre y un monto válido (no negativo).');
+    loadPresupuesto();
+    return;
+  }
+
+  fetch(`/api/presupuesto/items/${id}`, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ nombre, monto }),
+  })
+    .then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error al guardar');
+      renderResultados(data);
+      PRESU_CATEGORIAS.forEach(cat => {
+        const el2 = document.getElementById(`sub-${cat}`);
+        if (el2) el2.textContent = fmtMoney(data.totales[cat] || 0);
+      });
+    })
+    .catch(e => { alert(e.message); loadPresupuesto(); });
+}
+
+function deleteItem(id) {
+  if (!confirm('¿Eliminar este ítem?')) return;
+  fetch(`/api/presupuesto/items/${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(renderAll);
+}
+
+window.addEventListener('DOMContentLoaded', loadPresupuesto);
+</script>
+{% endblock %}

@@ -189,6 +189,33 @@ def set_meta_rd_mes(year, month, monto):
     db.session.commit()
 
 
+PRESUPUESTO_CATEGORIAS = ["ingreso_fijo", "ingreso_variable", "gasto_fijo", "gasto_variable", "deuda"]
+
+PRESUPUESTO_SEED = [
+    ("gasto_fijo", "Alquiler", 400.0),
+    ("gasto_fijo", "Suscripción Claude", 68.0),
+    ("gasto_fijo", "Frutos secos", 100.0),
+    ("ingreso_variable", "Ingreso semanal (S/ 90 x 4 semanas)", 360.0),
+]
+
+
+class PresupuestoItem(db.Model):
+    __tablename__ = "presupuesto_items"
+    id        = db.Column(db.Integer, primary_key=True)
+    categoria = db.Column(db.String(30), nullable=False)
+    nombre    = db.Column(db.String(120), nullable=False)
+    monto     = db.Column(db.Numeric(10, 2), nullable=False)
+    orden     = db.Column(db.Integer, nullable=False, default=0)
+
+
+def seed_presupuesto_si_vacio():
+    if PresupuestoItem.query.first() is not None:
+        return
+    for i, (categoria, nombre, monto) in enumerate(PRESUPUESTO_SEED):
+        db.session.add(PresupuestoItem(categoria=categoria, nombre=nombre, monto=monto, orden=i))
+    db.session.commit()
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def iter_months(y1, m1, y2, m2):
@@ -401,6 +428,12 @@ def dashboard_tarjeta():
 @login_requerido
 def dashboard_rd():
     return render_template("rd.html", active_tab="rd")
+
+
+@app.route("/dashboard/presupuesto")
+@login_requerido
+def dashboard_presupuesto():
+    return render_template("presupuesto.html", active_tab="presupuesto")
 
 
 @app.route("/nuevo", methods=["GET", "POST"])
@@ -1466,6 +1499,89 @@ def api_rd_meta_detail(id):
         m.year, m.month, m.monto_meta = year, month, monto
         db.session.commit()
         return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
+
+def _presupuesto_payload():
+    items = PresupuestoItem.query.order_by(PresupuestoItem.categoria, PresupuestoItem.orden, PresupuestoItem.id).all()
+    grouped = {cat: [] for cat in PRESUPUESTO_CATEGORIAS}
+    for it in items:
+        grouped.setdefault(it.categoria, []).append({
+            "id": it.id, "nombre": it.nombre, "monto": float(it.monto),
+        })
+
+    totales = {cat: round(sum(i["monto"] for i in grouped.get(cat, [])), 2) for cat in PRESUPUESTO_CATEGORIAS}
+    total_ingresos = round(totales["ingreso_fijo"] + totales["ingreso_variable"], 2)
+    total_gastos   = round(totales["gasto_fijo"] + totales["gasto_variable"], 2)
+    saldo_disponible = round(total_ingresos - total_gastos, 2)
+    cap_ahorro = round(saldo_disponible / total_ingresos * 100, 1) if total_ingresos else None
+    cap_endeudamiento = round(totales["deuda"] / total_ingresos * 100, 1) if total_ingresos else None
+
+    return {
+        "items": grouped,
+        "totales": {**totales, "total_ingresos": total_ingresos, "total_gastos": total_gastos},
+        "resultados": {
+            "saldo_disponible": saldo_disponible,
+            "capacidad_ahorro_pct": cap_ahorro,
+            "capacidad_endeudamiento_pct": cap_endeudamiento,
+        },
+    }
+
+
+@app.route("/api/presupuesto")
+@login_requerido
+def api_presupuesto():
+    seed_presupuesto_si_vacio()
+    return jsonify(_presupuesto_payload())
+
+
+@app.route("/api/presupuesto/items", methods=["POST"])
+@login_requerido
+def api_presupuesto_crear_item():
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        categoria = data.get("categoria", "")
+        nombre = (data.get("nombre") or "").strip()
+        monto = float(data["monto"])
+        if categoria not in PRESUPUESTO_CATEGORIAS:
+            return jsonify({"error": "Categoría inválida"}), 400
+        if not nombre:
+            return jsonify({"error": "Ingresa un nombre"}), 400
+        if monto < 0:
+            return jsonify({"error": "El monto no puede ser negativo"}), 400
+        max_orden = db.session.query(db.func.max(PresupuestoItem.orden)).filter_by(categoria=categoria).scalar() or 0
+        item = PresupuestoItem(categoria=categoria, nombre=nombre, monto=monto, orden=max_orden + 1)
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(_presupuesto_payload()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/presupuesto/items/<int:id>", methods=["PUT", "DELETE"])
+@login_requerido
+def api_presupuesto_item_detail(id):
+    item = PresupuestoItem.query.get_or_404(id)
+
+    if request.method == "DELETE":
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify(_presupuesto_payload())
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        nombre = (data.get("nombre") or "").strip()
+        monto = float(data["monto"])
+        if not nombre:
+            return jsonify({"error": "Ingresa un nombre"}), 400
+        if monto < 0:
+            return jsonify({"error": "El monto no puede ser negativo"}), 400
+        item.nombre, item.monto = nombre, monto
+        db.session.commit()
+        return jsonify(_presupuesto_payload())
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 400
