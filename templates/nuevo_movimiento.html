@@ -56,6 +56,10 @@
           <input type="radio" id="ingreso" name="tipo" value="Ingreso">
           <label for="ingreso" id="ingreso-label">Ingreso</label>
         </div>
+        <div class="pill-radio" id="fondo-tarjeta-wrap" style="display:none">
+          <input type="radio" id="fondo_tarjeta" name="tipo" value="Fondo">
+          <label for="fondo_tarjeta">Ingreso</label>
+        </div>
         <div class="pill-radio" id="tipo-meta-wrap" style="display:none">
           <input type="radio" id="meta" name="tipo" value="Meta">
           <label for="meta">Meta</label>
@@ -283,6 +287,18 @@
 
   function updateIngresoLabel() {
     document.getElementById('ingreso-label').textContent = isTarjetaCategoria() ? 'Repago' : 'Ingreso';
+  }
+
+  function updateFondoTarjetaVisibility() {
+    const wrap = document.getElementById('fondo-tarjeta-wrap');
+    if (isTarjetaCategoria()) {
+      wrap.style.display = '';
+    } else {
+      wrap.style.display = 'none';
+      if (document.getElementById('fondo_tarjeta').checked) {
+        document.getElementById('gasto').checked = true;
+      }
+    }
   }
 
   // Necesidades solo admite dólares en Gasto; Tarjeta los admite tanto al
@@ -590,6 +606,9 @@
     if (cat === 'Tarjeta' && tipo === 'Ingreso') {
       label.textContent = 'Nota del pago';
       input.placeholder = 'Ej: pago del ciclo de agosto...';
+    } else if (cat === 'Tarjeta' && tipo === 'Fondo') {
+      label.textContent = 'Nota del ingreso';
+      input.placeholder = 'Ej: parte del sueldo para la tarjeta...';
     } else if (cat === 'Tarjeta' && tipo === 'Gasto') {
       label.textContent = 'Descripción del consumo';
       input.placeholder = 'Ej: Netflix, Uber, supermercado...';
@@ -612,6 +631,7 @@
     updateIngresoLabel();
     updateRdTrainingVisibility();
     updateInversionTipoVisibility();
+    updateFondoTarjetaVisibility();
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');

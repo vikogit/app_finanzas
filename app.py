@@ -1333,12 +1333,23 @@ def api_tarjeta():
     pendientes = [c for c in ciclos if c["saldo"] > 0.001]
     proximo = min(pendientes, key=lambda c: c["vencimiento"]) if pendientes else None
 
+    # "Dinero que tengo para pagar la tarjeta": fondo separado (tipo "Fondo",
+    # etiquetado "Ingreso" en el formulario) menos lo que ya se aplicó como
+    # repago — un saldo disponible, no un acumulado histórico.
+    fondo_ingresos = sum(
+        float(m.importe) for m in Movimiento.query.filter(
+            Movimiento.tipo == "Fondo", Movimiento.categoria == "Tarjeta"
+        ).all()
+    )
+    dinero_disponible_pago = round(fondo_ingresos - sum(p["monto"] for p in pagos), 2)
+
     return jsonify({
         "kpis": {
             "deuda_total": round(sum(c["saldo"] for c in ciclos), 2),
             "proximo_vencimiento": proximo["vencimiento"] if proximo else None,
             "monto_proximo_vencimiento": proximo["saldo"] if proximo else 0,
             "ciclo_actual_total": ciclo_actual["total_cargos"] if ciclo_actual else 0,
+            "dinero_disponible_pago": dinero_disponible_pago,
         },
         "ciclos": ciclos,
         "pagos": [{
