@@ -476,14 +476,13 @@ def nuevo():
     return render_template("nuevo_movimiento.html")
 
 
-# Categorías habilitadas para transferencias. Se excluye "Inversión" (su tipo
-# "Gasto" representa aportes, no una salida real, y no admite "Ingreso" —
-# ver el fix de "Neto invertido") y se excluye "Tarjeta" como origen (su tipo
-# "Gasto" es un cargo/consumo nuevo en el ciclo, no dinero disponible para
-# mover). "Tarjeta" sí es un destino válido: transferir hacia ella equivale
-# a un repago real.
+# Categorías habilitadas para transferencias. Se excluyen "Inversión" (su
+# tipo "Gasto" representa aportes, no una salida real, y no admite "Ingreso"
+# — ver el fix de "Neto invertido") y "Tarjeta" (su tipo "Gasto" es un cargo
+# nuevo en el ciclo, no dinero disponible; y mezclar un repago real con una
+# transferencia genérica genera confusión) — a pedido del usuario.
 TRANSFER_ORIGEN_CATEGORIAS  = ["Colchón", "Necesidades", "Diversión", "VORTEX", "Earnings", "R&D"]
-TRANSFER_DESTINO_CATEGORIAS = TRANSFER_ORIGEN_CATEGORIAS + ["Tarjeta"]
+TRANSFER_DESTINO_CATEGORIAS = TRANSFER_ORIGEN_CATEGORIAS
 
 
 @app.route("/transferencia", methods=["GET", "POST"])
