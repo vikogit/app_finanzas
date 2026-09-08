@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Transferencia — App Finanzas{% endblock %}
+
+{% block content %}
+<style>
+  .transfer-flow {
+    display: flex; align-items: center; justify-content: center;
+    margin: -4px 0 4px; color: #60a5fa; opacity: 0.8;
+  }
+  .transfer-preview {
+    display: none; align-items: center; gap: 10px; margin-top: 4px; margin-bottom: 20px;
+    padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(59,130,246,0.3);
+    background: rgba(59,130,246,0.08); font-size: 13px; color: var(--text);
+  }
+  .transfer-preview.show { display: flex; }
+  .transfer-preview-icon {
+    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+    background: rgba(59,130,246,0.16); display: flex; align-items: center; justify-content: center;
+  }
+  .transfer-preview b { color: #60a5fa; }
+</style>
+
+<div class="page-hdr">
+  <h1 class="page-title">Transferencia entre categorías</h1>
+  <p class="page-sub">Mueve dinero de una categoría a otra — se registra como salida y entrada</p>
+</div>
+
+<div class="form-card">
+  <form method="POST" id="form-transferencia">
+
+    <div class="form-field">
+      <label for="fecha" class="form-label">Fecha</label>
+      <input type="date" id="fecha" name="fecha" required class="form-input">
+    </div>
+
+    <div class="form-field">
+      <span class="form-label">Desde (sale dinero de)</span>
+      <div class="pill-group">
+        {% for cat in origen_categorias %}
+        <div class="pill-radio">
+          <input type="radio" id="origen-{{ loop.index }}" name="origen" value="{{ cat }}" {% if loop.first %}checked{% endif %}>
+          <label for="origen-{{ loop.index }}">{{ 'R &amp; D' if cat == 'R&D' else cat }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="transfer-flow">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m0 0l-5.25-5.25M12 19.5l5.25-5.25"/></svg>
+    </div>
+
+    <div class="form-field">
+      <span class="form-label">Hacia (entra dinero a)</span>
+      <div class="pill-group">
+        {% for cat in destino_categorias %}
+        <div class="pill-radio">
+          <input type="radio" id="destino-{{ loop.index }}" name="destino" value="{{ cat }}" {% if loop.index == 2 %}checked{% endif %}>
+          <label for="destino-{{ loop.index }}">{{ 'R &amp; D' if cat == 'R&D' else cat }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label for="monto" class="form-label">Monto a transferir (S/)</label>
+      <div class="form-input-prefix">
+        <span class="form-prefix">S/</span>
+        <input type="number" id="monto" name="monto" step="0.01" min="0.01" required placeholder="0.00" class="form-input">
+      </div>
+    </div>
+
+    <div class="transfer-preview" id="transfer-preview">
+      <div class="transfer-preview-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+      </div>
+      <div id="transfer-preview-text"></div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-submit">Registrar transferencia</button>
+      <a href="/movimientos" class="btn-cancel">Cancelar</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('fecha').value = localDateStr(new Date());
+
+  function catLabel(v) { return v === 'R&D' ? 'R & D' : v; }
+  function fmtMoney(v) {
+    return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function updatePreview() {
+    const origen  = document.querySelector('input[name="origen"]:checked')?.value;
+    const destino = document.querySelector('input[name="destino"]:checked')?.value;
+    const monto   = parseFloat(document.getElementById('monto').value);
+    const box  = document.getElementById('transfer-preview');
+    const text = document.getElementById('transfer-preview-text');
+
+    if (!origen || !destino || !monto || monto <= 0) {
+      box.classList.remove('show');
+      return;
+    }
+    if (origen === destino) {
+      text.innerHTML = 'Elige dos categorías distintas para transferir.';
+      box.classList.add('show');
+      return;
+    }
+    text.innerHTML = `<b>${fmtMoney(monto)}</b> saldrá de <b>${catLabel(origen)}</b> y entrará a <b>${catLabel(destino)}</b>, ambos registrados como "Transferencia".`;
+    box.classList.add('show');
+  }
+
+  document.querySelectorAll('input[name="origen"], input[name="destino"]').forEach(el =>
+    el.addEventListener('change', updatePreview)
+  );
+  document.getElementById('monto').addEventListener('input', updatePreview);
+
+  document.getElementById('form-transferencia').addEventListener('submit', function(e) {
+    const origen  = document.querySelector('input[name="origen"]:checked')?.value;
+    const destino = document.querySelector('input[name="destino"]:checked')?.value;
+    if (origen === destino) {
+      e.preventDefault();
+      alert('Elige dos categorías distintas para la transferencia.');
+      return;
+    }
+    const monto = parseFloat(document.getElementById('monto').value);
+    if (!monto || monto <= 0) {
+      e.preventDefault();
+      alert('Ingresa un monto mayor a 0.');
+    }
+  });
+
+  updatePreview();
+</script>
+{% endblock %}

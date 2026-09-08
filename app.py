@@ -476,6 +476,50 @@ def nuevo():
     return render_template("nuevo_movimiento.html")
 
 
+# Categorías habilitadas para transferencias. Se excluye "Inversión" (su tipo
+# "Gasto" representa aportes, no una salida real, y no admite "Ingreso" —
+# ver el fix de "Neto invertido") y se excluye "Tarjeta" como origen (su tipo
+# "Gasto" es un cargo/consumo nuevo en el ciclo, no dinero disponible para
+# mover). "Tarjeta" sí es un destino válido: transferir hacia ella equivale
+# a un repago real.
+TRANSFER_ORIGEN_CATEGORIAS  = ["Colchón", "Necesidades", "Diversión", "VORTEX", "Earnings", "R&D"]
+TRANSFER_DESTINO_CATEGORIAS = TRANSFER_ORIGEN_CATEGORIAS + ["Tarjeta"]
+
+
+@app.route("/transferencia", methods=["GET", "POST"])
+@login_requerido
+def transferencia():
+    if request.method == "POST":
+        try:
+            fecha   = datetime.strptime(request.form["fecha"], "%Y-%m-%d").date()
+            origen  = request.form["origen"]
+            destino = request.form["destino"]
+            monto   = float(request.form["monto"])
+            if origen not in TRANSFER_ORIGEN_CATEGORIAS:
+                return "Error al guardar: categoría de origen inválida"
+            if destino not in TRANSFER_DESTINO_CATEGORIAS:
+                return "Error al guardar: categoría de destino inválida"
+            if origen == destino:
+                return "Error al guardar: elige dos categorías distintas"
+            if monto <= 0:
+                return "Error al guardar: el monto debe ser mayor a 0"
+            db.session.add_all([
+                Movimiento(fecha=fecha, tipo="Gasto",   categoria=origen,  descripcion="Transferencia", importe=monto),
+                Movimiento(fecha=fecha, tipo="Ingreso", categoria=destino, descripcion="Transferencia", importe=monto),
+            ])
+            db.session.commit()
+            return redirect(url_for("ver_movimientos"))
+        except Exception as e:
+            db.session.rollback()
+            return f"Error al guardar: {str(e)}"
+    return render_template(
+        "transferencia.html",
+        origen_categorias=TRANSFER_ORIGEN_CATEGORIAS,
+        destino_categorias=TRANSFER_DESTINO_CATEGORIAS,
+        active_tab="transferencia",
+    )
+
+
 @app.route("/movimientos")
 @login_requerido
 def ver_movimientos():

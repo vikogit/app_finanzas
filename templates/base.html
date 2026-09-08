@@ -151,6 +151,17 @@
     }
     .logout-btn:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
 
+    /* Transfer button */
+    .transfer-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 13px; border-radius: 10px; font-size: 12px; font-weight: 600;
+      color: var(--text-muted); text-decoration: none; border: 1px solid var(--border);
+      background: var(--input-bg); transition: color 0.15s, border-color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .transfer-btn:hover { color: #60a5fa; border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.08); }
+    .transfer-btn.active { color: #60a5fa; border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.12); }
+
     /* ─── Main ─── */
     .main { padding: 28px 28px 48px; flex: 1; }
 
@@ -515,8 +526,14 @@
         </svg>
       </div>
 
-      <!-- Nav links (movimientos + nuevo) -->
+      <!-- Nav links (movimientos + transferencia + nuevo) -->
       <a href="/movimientos" class="tab {% if active_tab=='movimientos' %}active{% endif %}">Movimientos</a>
+      <a href="/transferencia" class="transfer-btn {% if active_tab=='transferencia' %}active{% endif %}" aria-label="Transferencia entre categorías">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+        </svg>
+        Transferir
+      </a>
       <div class="glow-wrap {% if active_tab=='nuevo' %}glow-active{% endif %}">
         <div class="glow-layer glow-outer"><div class="glow-spin"></div></div>
         <div class="glow-layer glow-mid"><div class="glow-spin"></div></div>
