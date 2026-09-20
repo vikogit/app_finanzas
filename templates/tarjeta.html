@@ -187,9 +187,12 @@ function loadTarjeta() {
 function eliminarPago(id, origen) {
   if (!confirm('¿Seguro que deseas eliminar este pago?')) return;
   const req = origen === 'movimiento'
-    ? fetch(`/eliminar/${id}`)
+    ? fetch(`/eliminar/${id}`, { method: 'POST', headers: { 'Accept': 'application/json' } })
     : fetch(`/api/tarjeta/pagos/${id}`, { method: 'DELETE' });
-  req.then(loadTarjeta);
+  req.then(r => {
+    if (!r.ok) throw new Error('No se pudo eliminar el pago');
+    loadTarjeta();
+  }).catch(e => alert(e.message));
 }
 
 window.addEventListener('DOMContentLoaded', loadTarjeta);

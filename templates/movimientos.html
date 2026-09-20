@@ -95,18 +95,24 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3"/>
               </svg>Gasto
             </span>
+            {% elif m.tipo == 'Fondo' %}
+            <span class="badge-type badge-fondo" title="Dinero apartado para pagar la tarjeta">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M3.75 6h16.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-9A1.5 1.5 0 013.75 6z"/>
+              </svg>Fondo
+            </span>
             {% else %}
             <span class="badge-type badge-ingreso">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"/>
-              </svg>Ingreso
+              </svg>{{ 'Repago' if m.categoria == 'Tarjeta' else 'Ingreso' }}
             </span>
             {% endif %}
           </td>
           <td><span class="badge-cat">{{ m.categoria }}</span></td>
           <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.descripcion }}</td>
-          <td class="right" style="font-weight:700;white-space:nowrap;color:{{ '#f87171' if m.tipo=='Gasto' else '#4ade80' }}">
-            {{ '−' if m.tipo == 'Gasto' else '+' }} S/ {{ m.importe }}
+          <td class="right" style="font-weight:700;white-space:nowrap;color:{{ '#f87171' if m.tipo=='Gasto' else ('#60a5fa' if m.tipo=='Fondo' else '#4ade80') }}">
+            {{ '−' if m.tipo == 'Gasto' else '+' }} S/ {{ '%.2f'|format(m.importe) }}
           </td>
           <td class="right">
             <div style="display:flex;gap:6px;justify-content:flex-end">
@@ -116,14 +122,15 @@
                 </svg>
                 Editar
               </a>
-              <a href="/eliminar/{{ m.id }}"
-                 onclick="return confirm('¿Seguro que deseas eliminar este movimiento?')"
-                 class="btn-del" aria-label="Eliminar movimiento">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
-                </svg>
-                Eliminar
-              </a>
+              <form method="POST" action="/eliminar/{{ m.id }}" style="display:inline"
+                    onsubmit="return confirm('¿Seguro que deseas eliminar este movimiento?')">
+                <button type="submit" class="btn-del" aria-label="Eliminar movimiento">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                  </svg>
+                  Eliminar
+                </button>
+              </form>
             </div>
           </td>
         </tr>

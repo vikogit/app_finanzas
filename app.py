@@ -7,11 +7,21 @@ from functools import wraps
 from collections import defaultdict
 import os
 import calendar
+import hmac
 import requests as http_requests
 import time
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Cookie de sesión endurecida: no accesible desde JS, no viaja a otros sitios
+# y dura 30 días para no tener que reingresar en cada visita.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("RENDER") is not None,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
 
 USUARIO_ADMIN = os.getenv("APP_USER")
 PASSWORD_ADMIN = os.getenv("APP_PASSWORD")
@@ -216,6 +226,68 @@ def seed_presupuesto_si_vacio():
     db.session.commit()
 
 
+# ── validación de movimientos ─────────────────────────────────────────
+# Fuente única de verdad: cualquier categoría o tipo fuera de estas listas
+# queda huérfano (no lo suma ningún dashboard), así que se rechaza al guardar.
+CATEGORIAS_VALIDAS = ["Colchón", "Necesidades", "Diversión", "Inversión",
+                      "VORTEX", "Earnings", "Tarjeta", "R&D"]
+TIPOS_VALIDOS = ["Gasto", "Ingreso", "Fondo"]
+IMPORTE_MAXIMO = 10_000_000
+
+
+class DatosInvalidos(ValueError):
+    """Error de validación con un mensaje ya listo para mostrar al usuario."""
+
+
+def leer_movimiento_del_form(form, tipo_actual=None):
+    """Valida el formulario de movimiento y devuelve los campos ya limpios.
+
+    `tipo_actual` conserva el tipo existente al editar cuando el formulario no
+    lo envía (p. ej. "Fondo", que no tiene radio en todas las vistas).
+    """
+    fecha_raw = (form.get("fecha") or "").strip()
+    try:
+        fecha = datetime.strptime(fecha_raw, "%Y-%m-%d").date()
+    except ValueError:
+        raise DatosInvalidos("Ingresa una fecha válida (AAAA-MM-DD).")
+
+    tipo = (form.get("tipo") or tipo_actual or "").strip()
+    if tipo not in TIPOS_VALIDOS:
+        raise DatosInvalidos(f"Tipo de movimiento inválido: {tipo or '(vacío)'}.")
+
+    categoria = (form.get("categoria") or "").strip()
+    if categoria not in CATEGORIAS_VALIDAS:
+        raise DatosInvalidos(f"Categoría inválida: {categoria or '(vacía)'}.")
+
+    descripcion = (form.get("descripcion") or "").strip()
+    if not descripcion:
+        raise DatosInvalidos("La descripción no puede quedar vacía.")
+    descripcion = descripcion[:255]
+
+    try:
+        importe = float(form.get("importe") or "")
+    except ValueError:
+        raise DatosInvalidos("El importe debe ser un número.")
+    if importe <= 0:
+        raise DatosInvalidos("El importe debe ser mayor a 0.")
+    if importe > IMPORTE_MAXIMO:
+        raise DatosInvalidos("El importe supera el máximo permitido.")
+
+    return {
+        "fecha": fecha,
+        "tipo": tipo,
+        "categoria": categoria,
+        "descripcion": descripcion,
+        "importe": round(importe, 2),
+        "investment_asset_type": (form.get("investment_asset_type") or "").strip()[:50] or None,
+        "investment_asset_name": (form.get("investment_asset_name") or "").strip()[:100] or None,
+        # En la categoría "Tarjeta" el cargo ya pertenece a la tarjeta por
+        # definición, así que la bandera es redundante: se normaliza a False
+        # para que el dato guardado no dependa de lo que envíe el formulario.
+        "pagado_con_tarjeta": bool(form.get("pagado_con_tarjeta")) and categoria != "Tarjeta",
+    }
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 def iter_months(y1, m1, y2, m2):
@@ -231,6 +303,17 @@ def iter_months(y1, m1, y2, m2):
 def parse_year_month(s):
     y, m = s.split("-")
     return int(y), int(m)
+
+
+def metas_por_mes(modelo, y1, m1, y2, m2):
+    """Carga las metas del rango en UNA consulta → {(year, month): monto}.
+
+    Antes cada dashboard llamaba a get_meta_*_mes() dentro del bucle de meses,
+    lo que disparaba una consulta por mes (N+1) en cada carga del gráfico.
+    """
+    filas = modelo.query.filter(modelo.year >= y1, modelo.year <= y2).all()
+    return {(f.year, f.month): float(f.monto_meta)
+            for f in filas if (y1, m1) <= (f.year, f.month) <= (y2, m2)}
 
 
 def parse_dates(req):
@@ -256,21 +339,30 @@ def query_movs(desde, hasta, categoria=None, tipo=None):
     return q.order_by(Movimiento.fecha).all()
 
 
+def recortar_inicio(movs, desde):
+    """Adelanta `desde` hasta el primer movimiento real del período.
+
+    El filtro "Todo" manda desde=2000-01-01: sin este recorte los agrupadores
+    generaban ~300 meses (o ~9.500 días) vacíos antes del primer registro,
+    inflando la respuesta y aplanando los gráficos. Recortar no cambia ningún
+    total ni el acumulado, porque lo que se descarta está todo en cero.
+    """
+    if not movs:
+        return desde
+    return max(desde, min(m.fecha for m in movs))
+
+
 def agrupar_mensual(movs, desde, hasta):
     bucket = defaultdict(lambda: {"ingresos": 0.0, "gastos": 0.0})
     for m in movs:
         key = (m.fecha.year, m.fecha.month)
         v = float(m.importe)
         bucket[key]["ingresos" if m.tipo == "Ingreso" else "gastos"] += v
+    desde = recortar_inicio(movs, desde)
     meses = []
-    y, mo = desde.year, desde.month
-    while (y, mo) <= (hasta.year, hasta.month):
+    for y, mo in iter_months(desde.year, desde.month, hasta.year, hasta.month):
         v = bucket.get((y, mo), {"ingresos": 0.0, "gastos": 0.0})
         meses.append({"mes": date_type(y, mo, 1).strftime("%b %Y"), "ingresos": v["ingresos"], "gastos": v["gastos"]})
-        mo += 1
-        if mo > 12:
-            mo = 1
-            y += 1
     return meses
 
 
@@ -279,8 +371,8 @@ def agrupar_diario(movs, desde, hasta):
     for m in movs:
         v = float(m.importe)
         bucket[m.fecha]["ingresos" if m.tipo == "Ingreso" else "gastos"] += v
+    dia = recortar_inicio(movs, desde)
     dias = []
-    dia = desde
     while dia <= hasta:
         v = bucket.get(dia, {"ingresos": 0.0, "gastos": 0.0})
         dias.append({"fecha": dia.strftime("%d %b"), "ingresos": v["ingresos"], "gastos": v["gastos"]})
@@ -326,9 +418,10 @@ def ranking_por_descripcion(movs):
 
 
 # ── ciclos de tarjeta de crédito ────────────────────────────────────────
-# Corte el día 20: un ciclo agrupa consumos del 25 de un mes al 20 del
+# Corte el día 20: un ciclo agrupa consumos del 21 de un mes al 20 del
 # siguiente, con vencimiento de pago el 20 del mes subsiguiente
-# (ej. consumos del 25-jul al 20-ago vencen el 20-sep).
+# (ej. consumos del 21-jul al 20-ago vencen el 20-sep).
+CICLO_DIA_CORTE = 20
 
 def _add_months(year, month, delta):
     total = (year * 12 + (month - 1)) + delta
@@ -336,19 +429,25 @@ def _add_months(year, month, delta):
 
 
 def ciclo_de_fecha(fecha):
-    """Devuelve (year, month) del día 25 en que abre el ciclo al que pertenece `fecha`."""
-    if fecha.day >= 21:
+    """Devuelve (year, month) del mes en que abre el ciclo al que pertenece `fecha`."""
+    if fecha.day > CICLO_DIA_CORTE:
         return fecha.year, fecha.month
     y, m = _add_months(fecha.year, fecha.month, -1)
     return y, m
 
 
 def ciclo_bounds(year, month):
-    inicio = date_type(year, month, 25)
+    """Rango real del ciclo: del día siguiente al corte, hasta el corte del mes siguiente.
+
+    El inicio debe coincidir con el umbral de `ciclo_de_fecha` — cuando eran
+    distintos (día 25 vs. día 21), un consumo del 21 al 24 se asignaba a un
+    ciclo cuyo rango mostrado no lo contenía.
+    """
+    inicio = date_type(year, month, CICLO_DIA_CORTE + 1)
     cy, cm = _add_months(year, month, 1)
-    cierre = date_type(cy, cm, 20)
+    cierre = date_type(cy, cm, CICLO_DIA_CORTE)
     dy, dm = _add_months(year, month, 2)
-    vencimiento = date_type(dy, dm, 20)
+    vencimiento = date_type(dy, dm, CICLO_DIA_CORTE)
     return inicio, cierre, vencimiento
 
 
@@ -362,9 +461,14 @@ def ciclo_id(year, month):
 def login():
     error = None
     if request.method == "POST":
-        if (request.form["usuario"] == USUARIO_ADMIN and
-                request.form["password"] == PASSWORD_ADMIN):
-            session["usuario"] = request.form["usuario"]
+        usuario  = request.form.get("usuario", "")
+        password = request.form.get("password", "")
+        # compare_digest evita filtrar la contraseña por tiempo de respuesta.
+        if (USUARIO_ADMIN and PASSWORD_ADMIN
+                and hmac.compare_digest(usuario, USUARIO_ADMIN)
+                and hmac.compare_digest(password, PASSWORD_ADMIN)):
+            session["usuario"] = usuario
+            session.permanent = True
             return redirect(url_for("dashboard"))
         error = "Usuario o contraseña incorrectos"
     return render_template("login.html", error=error)
@@ -457,22 +561,15 @@ def nuevo():
                 db.session.rollback()
                 return f"Error al guardar: {str(e)}"
         try:
-            m = Movimiento(
-                fecha=datetime.strptime(request.form["fecha"], "%Y-%m-%d").date(),
-                tipo=request.form["tipo"],
-                categoria=request.form["categoria"],
-                descripcion=request.form["descripcion"],
-                importe=float(request.form["importe"]),
-                investment_asset_type=request.form.get("investment_asset_type") or None,
-                investment_asset_name=request.form.get("investment_asset_name") or None,
-                pagado_con_tarjeta=bool(request.form.get("pagado_con_tarjeta")),
-            )
-            db.session.add(m)
+            db.session.add(Movimiento(**leer_movimiento_del_form(request.form)))
             db.session.commit()
             return redirect(url_for("ver_movimientos"))
+        except DatosInvalidos as e:
+            db.session.rollback()
+            return render_template("nuevo_movimiento.html", error=str(e)), 400
         except Exception as e:
             db.session.rollback()
-            return f"Error al guardar: {str(e)}"
+            return render_template("nuevo_movimiento.html", error=f"No se pudo guardar: {e}"), 500
     return render_template("nuevo_movimiento.html")
 
 
@@ -554,7 +651,9 @@ def ver_movimientos():
     )
 
 
-@app.route("/eliminar/<int:id>")
+# Borrar es destructivo: solo por POST. Con GET, cualquier prefetch del
+# navegador (o un enlace abierto por accidente) podía borrar un movimiento.
+@app.route("/eliminar/<int:id>", methods=["POST"])
 @login_requerido
 def eliminar_movimiento(id):
     m = Movimiento.query.get_or_404(id)
@@ -563,7 +662,9 @@ def eliminar_movimiento(id):
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        return f"Error al eliminar: {str(e)}"
+        return f"Error al eliminar: {str(e)}", 500
+    if request.accept_mimetypes.best == "application/json" or request.is_json:
+        return jsonify({"ok": True})
     return redirect(url_for("ver_movimientos"))
 
 
@@ -573,38 +674,55 @@ def editar_movimiento(id):
     m = Movimiento.query.get_or_404(id)
     if request.method == "POST":
         try:
-            m.fecha = datetime.strptime(request.form["fecha"], "%Y-%m-%d").date()
-            m.tipo = request.form["tipo"]
-            m.categoria = request.form["categoria"]
-            m.descripcion = request.form["descripcion"]
-            m.importe = float(request.form["importe"])
-            m.investment_asset_type = request.form.get("investment_asset_type") or None
-            m.investment_asset_name = request.form.get("investment_asset_name") or None
-            m.pagado_con_tarjeta = bool(request.form.get("pagado_con_tarjeta"))
+            # tipo_actual conserva tipos sin radio propio (p. ej. "Fondo").
+            datos = leer_movimiento_del_form(request.form, tipo_actual=m.tipo)
+            for campo, valor in datos.items():
+                setattr(m, campo, valor)
             db.session.commit()
             return redirect(url_for("ver_movimientos"))
+        except DatosInvalidos as e:
+            db.session.rollback()
+            return render_template("editar_movimiento.html", m=m, error=str(e)), 400
         except Exception as e:
             db.session.rollback()
-            return f"Error al guardar: {str(e)}"
+            return render_template("editar_movimiento.html", m=m, error=f"No se pudo guardar: {e}"), 500
     return render_template("editar_movimiento.html", m=m)
 
 
 @app.route("/crear-tabla")
 @login_requerido
 def crear_tabla():
+    notas = []
     try:
         db.create_all()
-        # db.create_all() solo crea tablas nuevas — "movimientos" ya existe con
-        # datos, así que la columna nueva se agrega aparte (idempotente).
+        notas.append("Tablas creadas/verificadas")
+    except Exception as e:
+        db.session.rollback()
+        return f"Error creando tablas: {e}", 500
+
+    # db.create_all() solo crea tablas nuevas — "movimientos" ya existe con
+    # datos, así que la columna nueva se agrega aparte (idempotente). La
+    # sintaxis IF NOT EXISTS es de Postgres; en SQLite (desarrollo) la tabla
+    # ya nace con la columna, así que un fallo aquí no debe abortar el resto.
+    try:
         db.session.execute(db.text(
             "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS pagado_con_tarjeta "
             "BOOLEAN NOT NULL DEFAULT FALSE"
         ))
         db.session.commit()
-        return "Tabla creada correctamente"
+        notas.append("Columna pagado_con_tarjeta verificada")
     except Exception as e:
         db.session.rollback()
-        return f"Error: {str(e)}"
+        notas.append(f"ALTER TABLE omitido ({type(e).__name__})")
+
+    try:
+        seed_presupuesto_si_vacio()
+        notas.append("Presupuesto inicializado")
+    except Exception as e:
+        db.session.rollback()
+        notas.append(f"Presupuesto no inicializado ({type(e).__name__})")
+
+    return "OK — " + " · ".join(notas)
 
 
 @app.route("/test-db")
@@ -688,20 +806,14 @@ def api_necesidades():
     for m in movs:
         bucket[(m.fecha.year, m.fecha.month)]["ingresos" if m.tipo == "Ingreso" else "gastos"] += float(m.importe)
 
-    tendencia = []
-    y, mo = desde.year, desde.month
-    while (y, mo) <= (hasta.year, hasta.month):
-        v = bucket.get((y, mo), {"ingresos": 0.0, "gastos": 0.0})
-        tendencia.append({
-            "mes": date_type(y, mo, 1).strftime("%b %Y"),
-            "ingresos": round(v["ingresos"], 2),
-            "gastos": round(v["gastos"], 2),
-            "meta": get_meta_necesidades_mes(y, mo),
-        })
-        mo += 1
-        if mo > 12:
-            mo = 1
-            y += 1
+    desde_g = recortar_inicio(movs, desde)
+    metas = metas_por_mes(MetaNecesidadesMes, desde_g.year, desde_g.month, hasta.year, hasta.month)
+    tendencia = [{
+        "mes": date_type(y, mo, 1).strftime("%b %Y"),
+        "ingresos": round(bucket.get((y, mo), {"ingresos": 0.0})["ingresos"], 2),
+        "gastos": round(bucket.get((y, mo), {"gastos": 0.0})["gastos"], 2),
+        "meta": metas.get((y, mo)),
+    } for y, mo in iter_months(desde_g.year, desde_g.month, hasta.year, hasta.month)]
 
     meses = len(tendencia)
 
@@ -837,20 +949,14 @@ def api_diversion():
     for m in movs_div:
         bucket[(m.fecha.year, m.fecha.month)]["ingresos" if m.tipo == "Ingreso" else "gastos"] += float(m.importe)
 
-    tendencia = []
-    y, mo = desde.year, desde.month
-    while (y, mo) <= (hasta.year, hasta.month):
-        v = bucket.get((y, mo), {"ingresos": 0.0, "gastos": 0.0})
-        tendencia.append({
-            "mes": date_type(y, mo, 1).strftime("%b %Y"),
-            "ingresos": round(v["ingresos"], 2),
-            "gastos": round(v["gastos"], 2),
-            "meta": get_meta_diversion_mes(y, mo),
-        })
-        mo += 1
-        if mo > 12:
-            mo = 1
-            y += 1
+    desde_g = recortar_inicio(movs_div, desde)
+    metas = metas_por_mes(MetaDiversionMes, desde_g.year, desde_g.month, hasta.year, hasta.month)
+    tendencia = [{
+        "mes": date_type(y, mo, 1).strftime("%b %Y"),
+        "ingresos": round(bucket.get((y, mo), {"ingresos": 0.0})["ingresos"], 2),
+        "gastos": round(bucket.get((y, mo), {"gastos": 0.0})["gastos"], 2),
+        "meta": metas.get((y, mo)),
+    } for y, mo in iter_months(desde_g.year, desde_g.month, hasta.year, hasta.month)]
 
     meses = len(tendencia)
 
@@ -981,18 +1087,13 @@ def api_inversion():
         if m.tipo == "Gasto":
             bucket[(m.fecha.year, m.fecha.month)] += float(m.importe)
 
-    tendencia = []
-    y, mo = desde.year, desde.month
-    while (y, mo) <= (hasta.year, hasta.month):
-        tendencia.append({
-            "mes": date_type(y, mo, 1).strftime("%b %Y"),
-            "invertido": round(bucket.get((y, mo), 0.0), 2),
-            "meta": get_meta_inversion_mes(y, mo),
-        })
-        mo += 1
-        if mo > 12:
-            mo = 1
-            y += 1
+    desde_g = recortar_inicio(movs, desde)
+    metas = metas_por_mes(MetaInversionMes, desde_g.year, desde_g.month, hasta.year, hasta.month)
+    tendencia = [{
+        "mes": date_type(y, mo, 1).strftime("%b %Y"),
+        "invertido": round(bucket.get((y, mo), 0.0), 2),
+        "meta": metas.get((y, mo)),
+    } for y, mo in iter_months(desde_g.year, desde_g.month, hasta.year, hasta.month)]
 
     meses_activos = len([t for t in tendencia if t["invertido"]])
     return jsonify({
@@ -1453,10 +1554,11 @@ def api_rd():
     for mv in gastos:
         cursos_por_mes[(mv.fecha.year, mv.fecha.month)] += 1
 
+    metas_rd = metas_por_mes(MetaRdMes, desde.year, desde.month, hasta.year, hasta.month)
     cumplimiento_mensual = {
         "meses": [f"{MESES_ES[mm][:3]} {yy}" for yy, mm in ventana],
         "ingresos": [round(ingresos_por_mes.get(k, 0.0), 2) for k in ventana],
-        "meta": [get_meta_rd_mes(yy, mm) for yy, mm in ventana],
+        "meta": [metas_rd.get(k) for k in ventana],
         "curso_comprado": [cursos_por_mes.get(k, 0) >= RD_META_CURSOS_MES for k in ventana],
     }
 
