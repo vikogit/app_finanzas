@@ -1474,7 +1474,10 @@ def api_tarjeta():
                 restante -= aplicado
 
     for c in ciclos:
-        if c["saldo"] <= 0.001:
+        if c["total_cargos"] <= 0.001:
+            # Un ciclo sin consumos no está "pagado": no hay nada que pagar.
+            c["estado"] = "vacio"
+        elif c["saldo"] <= 0.001:
             c["estado"] = "pagado"
         elif c["vencimiento"] < hoy:
             c["estado"] = "vencido"

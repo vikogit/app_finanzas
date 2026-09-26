@@ -857,7 +857,11 @@
   }
 
   /* ─── Donut chart ─── */
-  function renderDonutChart(canvasId, items, centerHtml) {
+  /* `coloresFijos` (opcional): un color por ítem, para cuando el color
+     significa algo (rojo = gasto, verde = ahorro) y no debe rotar con la
+     paleta. Se pasa aquí y no se parchea después, para que la leyenda y
+     las porciones nunca queden con colores distintos. */
+  function renderDonutChart(canvasId, items, centerHtml, coloresFijos) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const dark = document.documentElement.classList.contains('dark');
 
@@ -874,6 +878,11 @@
       colors = DONUT_PALETTE.slice(0, DONUT_MAX_SLICES).concat([DONUT_OTHER_COLOR]);
     } else {
       colors = DONUT_PALETTE.slice(0, display.length);
+    }
+    // Se resuelven por etiqueta, no por posición: así el color sigue siendo
+    // el correcto aunque el orden cambie al ordenar de mayor a menor.
+    if (coloresFijos) {
+      colors = display.map((it, i) => coloresFijos[it.label] || colors[i]);
     }
     const total = display.reduce((s, i) => s + (i.value || 0), 0);
     const legendColor = dark ? 'rgba(255,255,255,0.6)' : '#475569';

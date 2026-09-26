@@ -112,6 +112,16 @@
   </div>
 </div>
 
+<div class="card card-p" id="reparto-card" style="margin-bottom:22px; display:none">
+  <div class="chart-title">
+    ¿A dónde va tu ingreso mensual?
+    <span class="chart-badge badge-blue">Pastel</span>
+  </div>
+  <div class="chart-donut-wrap" style="height:250px; max-width:430px; margin:0 auto; position:relative">
+    <canvas id="chartReparto"></canvas>
+  </div>
+</div>
+
 <div class="presu-grid">
   <div class="presu-card">
     <div class="presu-card-hdr">
@@ -274,9 +284,56 @@ function renderResultados(payload) {
 
 }
 
+let chartReparto = null;
+
+// Reparto del ingreso mensual. Usa colores fijos por concepto (no la paleta
+// rotatoria) para que "rojo = gastos" y "verde = ahorro" no cambien de sitio
+// cuando cambian los montos.
+const REPARTO_COLORES = {
+  'Gastos fijos':     'rgba(239,68,68,0.85)',
+  'Gastos variables': 'rgba(244,63,94,0.75)',
+  'Deudas':           'rgba(59,130,246,0.85)',
+  'Queda libre':      'rgba(34,197,94,0.85)',
+};
+
+function renderReparto(payload) {
+  const t = payload.totales;
+  const card = document.getElementById('reparto-card');
+  const ingresos = t.total_ingresos || 0;
+
+  // Sin ingresos no hay reparto que mostrar: un pastel de "todo gasto" mentiría.
+  if (ingresos <= 0) {
+    card.style.display = 'none';
+    if (chartReparto) { chartReparto.destroy(); chartReparto = null; }
+    return;
+  }
+  card.style.display = '';
+
+  const libre = Math.max(0, ingresos - (t.total_gastos || 0) - (t.deuda || 0));
+  const partes = [
+    { label: 'Gastos fijos',     value: t.gasto_fijo || 0 },
+    { label: 'Gastos variables', value: t.gasto_variable || 0 },
+    { label: 'Deudas',           value: t.deuda || 0 },
+    { label: 'Queda libre',      value: libre },
+  ].filter(p => p.value > 0);
+
+  if (chartReparto) {
+    chartReparto.destroy();
+    window._charts = window._charts.filter(c => c !== chartReparto);
+  }
+
+  const pctLibre = Math.round(libre / ingresos * 100);
+  const centro = `<div class="donut-center-val" style="color:${libre > 0 ? '#4ade80' : '#f87171'}">${pctLibre}%</div>
+                  <div class="donut-center-lbl">Queda libre</div>`;
+
+  chartReparto = renderDonutChart('chartReparto', partes, centro, REPARTO_COLORES);
+  window._charts.push(chartReparto);
+}
+
 function renderAll(payload) {
   renderRows(payload);
   renderResultados(payload);
+  renderReparto(payload);
 }
 
 function loadPresupuesto() {
@@ -317,7 +374,10 @@ function saveItem(id, el) {
     .then(async r => {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Error al guardar');
+      // Se recalcula todo menos las filas: reescribirlas aquí haría perder
+      // el foco mientras el usuario sigue editando.
       renderResultados(data);
+      renderReparto(data);
       PRESU_CATEGORIAS.forEach(cat => {
         const el2 = document.getElementById(`sub-${cat}`);
         if (el2) el2.textContent = fmtMoney(data.totales[cat] || 0);

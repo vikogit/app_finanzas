@@ -10,6 +10,7 @@
   .badge-pagado    { background: rgba(34,197,94,0.12);  color: #4ade80; }
   .badge-pendiente { background: rgba(124,58,237,0.14); color: #a78bfa; }
   .badge-vencido   { background: rgba(239,68,68,0.14);  color: #f87171; }
+  .badge-vacio     { background: var(--bg-card2);       color: var(--text-subtle); }
   .venc-hoy { color: #f87171; font-weight: 700; }
 </style>
 
@@ -46,6 +47,21 @@
     </div>
     <div class="kpi-label">Dinero para pagar la tarjeta</div>
     <div class="kpi-value" id="kpi-fondo-pago">S/ —</div>
+  </div>
+</div>
+
+<div class="card card-p" style="margin-bottom:22px">
+  <div class="chart-title">
+    Consumido vs. pagado por ciclo
+    <span class="chart-badge badge-purple">Barras</span>
+  </div>
+  <div class="chart-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Consumido</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>Pagado</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Saldo pendiente</div>
+  </div>
+  <div style="position:relative;height:230px">
+    <canvas id="chartCiclos"></canvas>
   </div>
 </div>
 
@@ -113,7 +129,66 @@ function fmtFecha(iso) {
   return `${d}/${m}/${y}`;
 }
 
-const ESTADO_LABEL = { pagado: 'Pagado', pendiente: 'Pendiente', vencido: 'Vencido' };
+const ESTADO_LABEL = { pagado: 'Pagado', pendiente: 'Pendiente', vencido: 'Vencido', vacio: 'Sin consumos' };
+
+let chartCiclos = null;
+
+// Consumido, pagado y saldo por ciclo — de más antiguo a más reciente, que
+// es como se lee una línea de tiempo.
+function renderCiclos(ciclos) {
+  // Los ciclos sin movimiento ocupan una ranura vacía en el eje; en la tabla
+  // sí se listan, pero en el gráfico solo estorban.
+  const datos = [...ciclos].reverse()
+    .filter(c => c.total_cargos > 0 || c.total_pagado > 0);
+  const ctx = document.getElementById('chartCiclos').getContext('2d');
+  const dark = document.documentElement.classList.contains('dark');
+  const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+
+  if (chartCiclos) {
+    chartCiclos.destroy();
+    window._charts = window._charts.filter(c => c !== chartCiclos);
+  }
+
+  chartCiclos = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: datos.map(c => fmtFecha(c.cierre).slice(0, 5)),
+      datasets: [
+        { label: 'Consumido', data: datos.map(c => c.total_cargos),
+          backgroundColor: 'rgba(167,139,250,0.75)', borderRadius: 5, maxBarThickness: 38 },
+        { label: 'Pagado', data: datos.map(c => c.total_pagado),
+          backgroundColor: 'rgba(74,222,128,0.75)', borderRadius: 5, maxBarThickness: 38 },
+        { label: 'Saldo', data: datos.map(c => c.saldo),
+          backgroundColor: 'rgba(248,113,113,0.75)', borderRadius: 5, maxBarThickness: 38 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: tickC, maxRotation: 0, font: { size: 10 } } },
+        y: { beginAtZero: true, grid: { color: gridC },
+             ticks: { color: tickC, font: { size: 10 }, callback: v => 'S/ ' + v.toLocaleString('es-PE') } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: dark ? 'rgba(6,6,16,0.95)' : 'rgba(15,23,42,0.94)',
+          titleColor: '#f1f5f9', bodyColor: '#f1f5f9',
+          borderColor: 'rgba(124,58,237,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
+          usePointStyle: true,
+          callbacks: {
+            title: items => 'Ciclo que cierra el ' + fmtFecha(datos[items[0].dataIndex].cierre),
+            label: c => ` ${c.dataset.label}: ${fmtMoney(c.parsed.y ?? 0)}`,
+          }
+        }
+      }
+    }
+  });
+  window._charts.push(chartCiclos);
+}
 
 function loadTarjeta() {
   fetch('/api/tarjeta')
@@ -136,6 +211,8 @@ function loadTarjeta() {
       const kpiFondoPago = document.getElementById('kpi-fondo-pago');
       kpiFondoPago.textContent = fmtMoney(data.kpis.dinero_disponible_pago);
       kpiFondoPago.style.color = data.kpis.dinero_disponible_pago >= 0 ? '#4ade80' : '#f87171';
+
+      renderCiclos(data.ciclos);
 
       const ciclosBody = document.getElementById('ciclos-body');
       const ciclosEmpty = document.getElementById('ciclos-empty');

@@ -289,6 +289,20 @@ function renderChartEarnings(barras, metaLinea) {
   const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
 
+  // El eje X es lineal (un punto por día), así que Chart.js no calcula solo
+  // el ancho: con grosor fijo las barras quedaban como astillas en rangos
+  // cortos y se encimaban en rangos largos. Se adapta a cuántos días hay.
+  const numDias = (barras.neto || []).length || 1;
+  const grosor = numDias > 120 ? 3
+               : numDias > 60  ? 5
+               : numDias > 30  ? 9
+               : numDias > 14  ? 16
+               : 28;
+
+  const VERDE = { fill: '#22c55e', borde: '#6ee7a4', hover: '#34d97d' };
+  const ROJO  = { fill: '#ef4444', borde: '#fca5a5', hover: '#f65c5c' };
+  const tono = c => (c.raw && c.raw.y >= 0 ? VERDE : ROJO);
+
   return new Chart(ctx, {
     data: {
       datasets: [
@@ -296,10 +310,18 @@ function renderChartEarnings(barras, metaLinea) {
           type: 'bar',
           label: 'Neto diario',
           data: barras.neto,
-          backgroundColor: (c) => (c.raw && c.raw.y >= 0 ? 'rgba(34,197,94,0.85)' : 'rgba(239,68,68,0.85)'),
-          borderRadius: 3,
-          barThickness: 22,
-          maxBarThickness: 30,
+          // Relleno sólido + borde claro: antes era un translúcido al 85%
+          // que se confundía con el fondo oscuro de la página.
+          backgroundColor: c => tono(c).fill,
+          borderColor:     c => tono(c).borde,
+          hoverBackgroundColor: c => tono(c).hover,
+          borderWidth: 1.5,
+          borderSkipped: false,
+          borderRadius: 4,
+          barThickness: grosor,
+          maxBarThickness: 34,
+          // Un día de S/ 2 en una escala de S/ 300 no pintaba ni un píxel.
+          minBarLength: 5,
           order: 3,
         },
         {
@@ -348,8 +370,18 @@ function renderChartEarnings(barras, metaLinea) {
           ticks: { color: tickC, maxRotation: 0, callback: v => fmtEpochDay(v) },
         },
         y: {
-          grid: { color: gridC },
-          ticks: { color: tickC, callback: v => 'S/ ' + v.toLocaleString('es-PE') },
+          grid: {
+            // Línea de cero marcada: separa a simple vista los días en verde
+            // (ganancia) de los días en rojo (pérdida).
+            color: c => (c.tick.value === 0
+              ? (dark ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.30)')
+              : gridC),
+            lineWidth: c => (c.tick.value === 0 ? 1.5 : 1),
+          },
+          ticks: {
+            color: c => (c.tick.value === 0 ? (dark ? 'rgba(255,255,255,0.7)' : '#334155') : tickC),
+            callback: v => 'S/ ' + v.toLocaleString('es-PE'),
+          },
         }
       },
       plugins: {
