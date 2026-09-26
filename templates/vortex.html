@@ -210,8 +210,7 @@ function renderLeaderboard(ranking, numAlumnos) {
 }
 
 function loadData(desde, hasta) {
-  fetch(`/api/vortex?desde=${desde}&hasta=${hasta}`)
-    .then(r => r.json())
+  cargarJSON(`/api/vortex?desde=${desde}&hasta=${hasta}`)
     .then(data => {
       document.getElementById('kpi-ingresos').textContent = fmtMoney(data.kpis.total_ingresos);
       document.getElementById('kpi-gastos').textContent   = fmtMoney(data.kpis.total_gastos);
@@ -250,7 +249,8 @@ function loadData(desde, hasta) {
       window._charts.push(chartArea, chartDonutAlumno, chartBar, chartDonutGasto);
 
       renderLeaderboard(data.ranking_alumnos, data.kpis.num_alumnos);
-    });
+    })
+    .catch(e => mostrarErrorCarga(`No se pudieron cargar los datos de VORTEX: ${e.message}`));
 }
 
 window.addEventListener('DOMContentLoaded', () => {

@@ -200,8 +200,7 @@ let treemapChart = null;
 let barChart = null;
 
 function loadData(desde, hasta) {
-  fetch(`/api/resumen?desde=${desde}&hasta=${hasta}`)
-    .then(r => r.json())
+  cargarJSON(`/api/resumen?desde=${desde}&hasta=${hasta}`)
     .then(data => {
       // KPIs
       const fmt = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -216,7 +215,8 @@ function loadData(desde, hasta) {
 
       // Bar mensual
       renderBarMensual(data.por_mes);
-    });
+    })
+    .catch(e => mostrarErrorCarga(`No se pudieron cargar los datos del resumen general: ${e.message}`));
 }
 
 function renderTreemap(treeData) {

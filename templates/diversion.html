@@ -188,19 +188,28 @@ function renderTendencia(tendencia) {
     data: {
       labels: tendencia.map(t => t.mes),
       datasets: [
+        // Gastos en positivo: antes iban hacia abajo mientras la meta se
+        // dibujaba arriba, así que no se podían comparar — que es justo para
+        // lo que sirve este gráfico. Ahora la barra que pasa la línea es,
+        // literalmente, el mes en que te excediste.
+        {
+          type: 'bar',
+          label: 'Gastos',
+          data: tendencia.map(t => t.gastos),
+          backgroundColor: tendencia.map(t =>
+            t.meta && t.gastos > t.meta ? 'rgba(239,68,68,0.9)' : 'rgba(248,113,113,0.65)'),
+          borderRadius: 5,
+          maxBarThickness: 46,
+          order: 2,
+        },
         {
           type: 'bar',
           label: 'Ingresos',
           data: tendencia.map(t => t.ingresos),
-          backgroundColor: 'rgba(34,197,94,0.75)',
-          borderRadius: 4,
-        },
-        {
-          type: 'bar',
-          label: 'Gastos',
-          data: tendencia.map(t => -t.gastos),
-          backgroundColor: 'rgba(248,113,113,0.75)',
-          borderRadius: 4,
+          backgroundColor: 'rgba(34,197,94,0.7)',
+          borderRadius: 5,
+          maxBarThickness: 46,
+          order: 3,
         },
         {
           type: 'line',
@@ -208,9 +217,12 @@ function renderTendencia(tendencia) {
           data: tendencia.map(t => t.meta),
           borderColor: '#38bdf8',
           borderWidth: 2,
-          borderDash: [4, 3],
+          borderDash: [5, 4],
           pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: '#38bdf8',
           spanGaps: false,
+          order: 1,
         },
       ]
     },
@@ -219,7 +231,7 @@ function renderTendencia(tendencia) {
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { grid: { color: gridC }, ticks: { color: tickC, maxRotation: 0 } },
-        y: { grid: { color: gridC }, ticks: { color: tickC, callback: v => 'S/ ' + Math.abs(v).toLocaleString('es-PE') } },
+        y: { beginAtZero: true, grid: { color: gridC }, ticks: { color: tickC, callback: v => 'S/ ' + v.toLocaleString('es-PE') } },
       },
       plugins: {
         legend: { display: false },
@@ -379,7 +391,7 @@ function loadData(desde, hasta) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const desde = '2026-03-01';
+  const desde = fechaInicioDe('diversion');
   const hasta = localDateStr(new Date());
   document.getElementById('desde').value = desde;
   document.getElementById('hasta').value = hasta;

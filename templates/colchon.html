@@ -71,8 +71,7 @@
 let chartArea = null, chartDonut = null;
 
 function loadData(desde, hasta) {
-  fetch(`/api/colchon?desde=${desde}&hasta=${hasta}`)
-    .then(r => r.json())
+  cargarJSON(`/api/colchon?desde=${desde}&hasta=${hasta}`)
     .then(data => {
       const fmt = v => 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
       const kpiSaldo = document.getElementById('kpi-saldo');
@@ -92,11 +91,12 @@ function loadData(desde, hasta) {
       chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
 
       window._charts.push(chartArea, chartDonut);
-    });
+    })
+    .catch(e => mostrarErrorCarga(`No se pudieron cargar los datos de Colchón: ${e.message}`));
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const desde = '2025-07-01';
+  const desde = fechaInicioDe('colchon');
   const hasta = localDateStr(new Date());
   document.getElementById('desde').value = desde;
   document.getElementById('hasta').value = hasta;

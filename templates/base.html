@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}App Finanzas{% endblock %}</title>
+  <meta name="theme-color" content="#0f0f12">
+  <!-- Favicon incrustado: evita el 404 de /favicon.ico en cada carga -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f97316'/%3E%3Cpath d='M9 21V11h10M9 16h7' stroke='white' stroke-width='2.6' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -105,14 +108,21 @@
     .brand-icon { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#f97316,#dc2626); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .brand-name { font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: -0.3px; }
 
-    /* Tabs */
-    .tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+    /* Tabs — flex:1 + min-width:0 permite que se encojan y hagan scroll en vez
+       de quedar recortadas (con 10 pestañas ya no entraban ni en 1440px). */
+    .tabs {
+      display: flex; gap: 1px; overflow-x: auto; scrollbar-width: none;
+      flex: 1 1 auto; min-width: 0; justify-content: center;
+      /* Difumina el borde derecho para indicar que hay más pestañas */
+      -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
+      mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
+    }
     .tabs::-webkit-scrollbar { display: none; }
     .tab {
-      padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500;
+      padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 500;
       color: var(--tab-text); cursor: pointer; white-space: nowrap;
       text-decoration: none; transition: background 0.15s, color 0.15s;
-      border: 1px solid transparent;
+      border: 1px solid transparent; flex-shrink: 0;
     }
     .tab:hover { color: var(--text); background: var(--bg-card2); }
     .tab.active {
@@ -123,7 +133,7 @@
     }
 
     /* Nav right */
-    .nav-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
     /* Toggle */
     .toggle-wrap { display: flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -323,9 +333,12 @@
     }
 
     /* ─── Category navigation cards ─── */
+    /* 9 categorías: en 4 columnas la última fila quedaba con 1 tarjeta y 3
+       huecos. auto-fit reparte lo que entre y llena siempre la fila. */
     .cat-nav-grid {
-      display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px;
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px;
     }
+    @media (min-width: 1500px) { .cat-nav-grid { grid-template-columns: repeat(4,1fr); } }
     .cat-card {
       display: flex; flex-direction: column; gap: 10px; text-decoration: none;
       color: var(--text); background: var(--bg-card); border: 1px solid var(--kpi-border);
@@ -444,6 +457,22 @@
       transition: color 0.15s, background 0.15s;
     }
     .btn-cancel:hover { color: var(--text); background: var(--border); }
+
+    /* ─── Aviso cuando no se pudieron cargar los datos ─── */
+    .data-error {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+      padding: 11px 14px; border-radius: 12px; font-size: 13px;
+      color: #fca5a5; background: rgba(239,68,68,0.10);
+      border: 1px solid rgba(239,68,68,0.32);
+    }
+    html:not(.dark) .data-error { color: #b91c1c; background: rgba(239,68,68,0.07); }
+    .data-error svg { flex-shrink: 0; }
+    .data-error-retry {
+      margin-left: auto; flex-shrink: 0; padding: 4px 12px; border-radius: 7px;
+      font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+      color: inherit; background: rgba(239,68,68,0.14); border: 1px solid rgba(239,68,68,0.3);
+    }
+    .data-error-retry:hover { background: rgba(239,68,68,0.22); }
 
     /* ─── Mensaje de error en formularios ─── */
     .form-error {
@@ -629,6 +658,62 @@
     return `${y}-${m}`;
   }
 
+  /* ─── Formato de dinero (única definición para toda la app) ─── */
+  function fmtSoles(v) {
+    const n = Number(v) || 0;
+    return 'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /* ─── Carga de datos con aviso visible si algo falla ───
+     Antes, si la API fallaba (Render dormido, sin red), el dashboard se
+     quedaba mostrando "S/ —" para siempre y sin ninguna explicación. */
+  function mostrarErrorCarga(mensaje) {
+    let banner = document.getElementById('data-error-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'data-error-banner';
+      banner.className = 'data-error';
+      banner.setAttribute('role', 'alert');
+      const main = document.querySelector('.main');
+      main.insertBefore(banner, main.firstChild);
+    }
+    banner.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+      </svg>
+      <span>${mensaje}</span>
+      <button type="button" class="data-error-retry" onclick="location.reload()">Reintentar</button>`;
+  }
+
+  function ocultarErrorCarga() {
+    const banner = document.getElementById('data-error-banner');
+    if (banner) banner.remove();
+  }
+
+  async function cargarJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`El servidor respondió ${r.status}`);
+    const data = await r.json();
+    ocultarErrorCarga();
+    return data;
+  }
+
+  /* ─── Fecha inicial por defecto de cada dashboard ───
+     Estaban repetidas dentro de cada template; aquí se ven juntas y se
+     cambian en un solo sitio. Cada una es donde empiezan los datos útiles
+     de esa categoría. */
+  const FECHA_INICIO_POR_DASHBOARD = {
+    colchon:     '2025-07-01',
+    necesidades: '2026-03-01',
+    diversion:   '2026-03-01',
+    inversion:   '2026-03-01',
+    rd:          '2026-07-01',
+  };
+
+  function fechaInicioDe(dashboard) {
+    return FECHA_INICIO_POR_DASHBOARD[dashboard] || getDefaultDates().desde;
+  }
+
   /* ─── Filter bar helpers ─── */
   function getDefaultDates() {
     const now = new Date();
@@ -669,21 +754,24 @@
   }
 
   /* ─── Category colours ─── */
+  /* Mismo color que el acento de cada dashboard y el borde de su tarjeta en
+     el Resumen. Antes Necesidades salía naranja, Diversión morada e Inversión
+     azul en el mapa de árbol, contradiciendo su identidad en el resto de la app. */
   const CAT_COLORS = {
-    'Necesidades': '#f97316',
     'Colchón':     '#22c55e',
-    'Inversión':   '#3b82f6',
-    'Diversión':   '#a855f7',
+    'Necesidades': '#6366f1',
+    'Diversión':   '#f97316',
+    'Inversión':   '#ca8a04',
     'VORTEX':      '#06b6d4',
     'Earnings':    '#0d9488',
     'Tarjeta':     '#7c3aed',
-    'R&D':         '#ec4899',
+    'R&D':         '#db2777',
   };
   const CAT_COLORS_DARK = {
-    'Necesidades': '#fb923c',
     'Colchón':     '#4ade80',
-    'Inversión':   '#60a5fa',
-    'Diversión':   '#c084fc',
+    'Necesidades': '#818cf8',
+    'Diversión':   '#fb923c',
+    'Inversión':   '#facc15',
     'VORTEX':      '#22d3ee',
     'Earnings':    '#2dd4bf',
     'Tarjeta':     '#a78bfa',

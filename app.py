@@ -474,6 +474,21 @@ def login():
     return render_template("login.html", error=error)
 
 
+FAVICON_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+    "<rect width='32' height='32' rx='8' fill='#f97316'/>"
+    "<path d='M9 21V11h10M9 16h7' stroke='white' stroke-width='2.6' "
+    "stroke-linecap='round' fill='none'/></svg>"
+)
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """Los navegadores piden /favicon.ico igual; sin esta ruta era un 404 por carga."""
+    return app.response_class(FAVICON_SVG, mimetype="image/svg+xml",
+                              headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.route("/logout")
 def logout():
     session.pop("usuario", None)

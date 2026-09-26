@@ -479,7 +479,7 @@ function deleteMeta(id) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const desde = '2026-07-01';
+  const desde = fechaInicioDe('rd');
   const hasta = localDateStr(new Date());
   document.getElementById('desde').value = desde;
   document.getElementById('hasta').value = hasta;

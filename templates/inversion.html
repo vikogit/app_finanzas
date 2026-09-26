@@ -356,7 +356,7 @@ function loadData(desde, hasta) {
 
 window.addEventListener('DOMContentLoaded', () => {
   const d = getDefaultDates();
-  d.desde = '2026-03-01';
+  d.desde = fechaInicioDe('inversion');
   document.getElementById('desde').value = d.desde;
   document.getElementById('hasta').value = d.hasta;
   loadData(d.desde, d.hasta);
