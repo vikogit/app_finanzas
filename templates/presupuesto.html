@@ -4,7 +4,7 @@
 {% block content %}
 <style>
   /* ─── Resultados panel ─── */
-  .resultados-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-bottom: 22px; }
+  .resultados-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin-bottom: 22px; }
   .resultado-card {
     background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px;
     padding: 18px 20px; backdrop-filter: blur(10px); position: relative; overflow: hidden;
@@ -32,7 +32,9 @@
   .badge-red    .dot { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.6); }
 
   /* ─── Category cards ─── */
-  .presu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  /* minmax(0,1fr) y no 1fr: con 1fr la tarjeta podía crecer más que su
+     columna y sacaba la página 11px del viewport en móvil. */
+  .presu-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
   .presu-card {
     background: var(--bg-card); border: 1px solid var(--kpi-border); border-radius: 16px;
     padding: 18px 20px; backdrop-filter: blur(10px);
@@ -85,10 +87,10 @@
   .presu-deuda-wrap { margin-top: 16px; }
 
   @media (max-width: 900px) {
-    .presu-grid { grid-template-columns: 1fr; }
+    .presu-grid { grid-template-columns: minmax(0,1fr); }
   }
   @media (max-width: 480px) {
-    .resultados-grid { grid-template-columns: 1fr; }
+    .resultados-grid { grid-template-columns: minmax(0,1fr); }
     .presu-amount-wrap { flex: 0 0 100px; }
   }
 </style>
