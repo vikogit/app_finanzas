@@ -218,8 +218,12 @@ function renderCumplimiento(c) {
           type: 'bar',
           label: 'Ingresos',
           data: c.ingresos,
-          backgroundColor: 'rgba(244,114,182,0.75)',
-          borderRadius: 4,
+          // Sin tope, con pocos meses en el rango cada barra ocupaba todo
+          // su carril y el gráfico parecía bloques sólidos.
+          backgroundColor: c.ingresos.map((v, i) =>
+            c.meta[i] && v >= c.meta[i] ? 'rgba(244,114,182,0.95)' : 'rgba(244,114,182,0.6)'),
+          borderRadius: 5,
+          maxBarThickness: 48,
         },
         {
           type: 'line',
