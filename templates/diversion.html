@@ -380,7 +380,7 @@ function loadData(desde, hasta) {
                       <div class="donut-center-lbl">Del total</div>`;
 
       chartTendencia = renderTendencia(data.tendencia_mensual);
-      chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
+      chartDonut = renderDonutChart('chartDonut', data.top_items, center);
 
       window._charts.push(chartTendencia, chartDonut);
     })

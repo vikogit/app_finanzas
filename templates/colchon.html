@@ -88,7 +88,7 @@ function loadData(desde, hasta) {
                       <div class="donut-center-lbl">Neto</div>`;
 
       chartArea  = renderEtoroChart('chartArea',  data.evolucion.map(d=>d.mes), data.evolucion.map(d=>d.acumulado), '#22c55e', 34, 197, 94);
-      chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
+      chartDonut = renderDonutChart('chartDonut', data.top_items, center);
 
       window._charts.push(chartArea, chartDonut);
     })

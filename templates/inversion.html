@@ -184,8 +184,9 @@ function renderTendencia(tendencia) {
           type: 'bar',
           label: 'Invertido',
           data: tendencia.map(t => t.invertido),
-          backgroundColor: 'rgba(34,197,94,0.75)',
-          borderRadius: 4,
+          backgroundColor: tendencia.map(t =>
+            t.meta && t.invertido >= t.meta ? 'rgba(34,197,94,0.9)' : 'rgba(34,197,94,0.6)'),
+          borderRadius: 5, maxBarThickness: 46,
         },
         {
           type: 'line',
@@ -348,7 +349,7 @@ function loadData(desde, hasta) {
                       <div class="donut-center-lbl">Neto</div>`;
 
       chartTendencia = renderTendencia(data.tendencia_mensual);
-      chartDonut = renderDonutChart('chartDonut', data.top_items.length ? data.top_items : [{label:'Sin datos',value:1}], center);
+      chartDonut = renderDonutChart('chartDonut', data.top_items, center);
 
       window._charts.push(chartTendencia, chartDonut);
     });

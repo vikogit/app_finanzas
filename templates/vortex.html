@@ -141,8 +141,8 @@ function renderBarVortex(porMes) {
     data: {
       labels: porMes.map(d => d.mes),
       datasets: [
-        { label: 'Ingresos', data: porMes.map(d => d.ingresos), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 4 },
-        { label: 'Gastos',   data: porMes.map(d => d.gastos),   backgroundColor: 'rgba(248,113,113,0.7)', borderRadius: 4 },
+        { label: 'Ingresos', data: porMes.map(d => d.ingresos), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 5, maxBarThickness: 52 },
+        { label: 'Gastos',   data: porMes.map(d => d.gastos),   backgroundColor: 'rgba(248,113,113,0.7)', borderRadius: 5, maxBarThickness: 52 },
       ]
     },
     options: {
@@ -236,13 +236,13 @@ function loadData(desde, hasta) {
       );
       chartDonutAlumno = renderDonutChart(
         'chartDonutAlumno',
-        data.ingresos_por_alumno.length ? data.ingresos_por_alumno : [{label:'Sin datos',value:1}],
+        data.ingresos_por_alumno,
         centerAlumno
       );
       chartBar = renderBarVortex(data.por_mes);
       chartDonutGasto = renderDonutChart(
         'chartDonutGasto',
-        data.gastos_por_concepto.length ? data.gastos_por_concepto : [{label:'Sin datos',value:1}],
+        data.gastos_por_concepto,
         centerGasto
       );
 

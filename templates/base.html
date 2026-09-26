@@ -893,6 +893,35 @@
     /* Cap at DONUT_MAX_SLICES real categories + "Otros" — beyond that a ring
        becomes an unreadable sliver soup. Sort descending first so the biggest
        slice always lands at 12 o'clock and "Otros" only ever absorbs the tail. */
+    /* Sin datos: antes los dashboards inventaban una porción {'Sin datos': 1}
+       y salía un anillo naranja completo al 100%, indistinguible de un dato
+       real. Aquí se dibuja un aro neutro y apagado que se lee como vacío. */
+    const hayDatos = (items || []).some(i => (i.value || 0) > 0);
+    if (!hayDatos) {
+      const chartVacio = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: ['Sin datos'], datasets: [{
+          data: [1],
+          backgroundColor: [dark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)'],
+          borderWidth: 0, hoverOffset: 0,
+        }] },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '74%',
+          animation: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        }
+      });
+      const wrapVacio = ctx.canvas.parentElement;
+      let elVacio = wrapVacio.querySelector('.donut-center');
+      if (!elVacio) {
+        elVacio = document.createElement('div');
+        elVacio.className = 'donut-center';
+        wrapVacio.appendChild(elVacio);
+      }
+      elVacio.innerHTML = `<div class="donut-center-lbl" style="font-size:11px;letter-spacing:0.4px">Sin datos<br>en este período</div>`;
+      return chartVacio;
+    }
+
     const sorted = items.slice().sort((a, b) => (b.value || 0) - (a.value || 0));
     let display = sorted;
     let colors;

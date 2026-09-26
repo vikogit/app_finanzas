@@ -281,13 +281,13 @@ function renderBarMensual(porMes) {
           label: 'Ingresos',
           data: porMes.map(d => d.ingresos),
           backgroundColor: 'rgba(34,197,94,0.7)',
-          borderRadius: 4,
+          borderRadius: 5, maxBarThickness: 52,
         },
         {
           label: 'Gastos',
           data: porMes.map(d => d.gastos),
           backgroundColor: 'rgba(248,113,113,0.7)',
-          borderRadius: 4,
+          borderRadius: 5, maxBarThickness: 52,
         }
       ]
     },

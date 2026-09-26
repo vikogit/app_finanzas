@@ -578,7 +578,7 @@ function loadData(desde, hasta) {
       chartEarnings = renderChartEarnings(data.barras, data.meta_linea);
       chartFuentes = renderDonutChart(
         'chartFuentes',
-        data.fuentes.length ? data.fuentes : [{label:'Sin datos', value:1}],
+        data.fuentes,
         `<div class="donut-center-val" style="color:#0d9488">${fmtMoney(data.kpis.total_ingresos)}</div><div class="donut-center-lbl">Ingresos</div>`
       );
 

@@ -357,7 +357,7 @@ function loadData(desde, hasta) {
       chartFlujo = renderFlujo(data.flujo_fondo);
       chartArea = renderDonutChart(
         'chartArea',
-        data.por_area.length ? data.por_area : [{label:'Sin datos', value:1}],
+        data.por_area,
         `<div class="donut-center-val" style="color:#f472b6">${fmtMoney(data.kpis.fondo_disponible)}</div><div class="donut-center-lbl">Fondo</div>`
       );
 
