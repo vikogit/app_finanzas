@@ -230,11 +230,11 @@ function rowHtml(categoria, item) {
   return `
     <div class="presu-row" data-id="${item.id}">
       <input type="text" class="presu-input-nombre" value="${item.nombre.replace(/"/g,'&quot;')}"
-             placeholder="Concepto" onblur="saveItem(${item.id}, this)" onkeydown="if(event.key==='Enter')this.blur()">
+             placeholder="Concepto" aria-label="Concepto del ítem" onblur="saveItem(${item.id}, this)" onkeydown="if(event.key==='Enter')this.blur()">
       <div class="presu-amount-wrap">
         <span class="presu-prefix">S/</span>
         <input type="number" class="presu-input-monto" value="${item.monto}" step="0.01" min="0"
-               onblur="saveItem(${item.id}, this)" onkeydown="if(event.key==='Enter')this.blur()">
+               aria-label="Monto mensual en soles" onblur="saveItem(${item.id}, this)" onkeydown="if(event.key==='Enter')this.blur()">
       </div>
       <button type="button" class="presu-del-btn" title="Eliminar" onclick="deleteItem(${item.id})">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9M4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M6.31 5.393c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m3.09 0a48.667 48.667 0 013.478.397"/></svg>

@@ -8,9 +8,9 @@
 
 <div class="filter-bar">
   <span class="filter-label">Período</span>
-  <input type="date" id="desde" class="date-input">
+  <input type="date" id="desde" class="date-input" aria-label="Fecha de inicio del período">
   <span class="filter-sep">→</span>
-  <input type="date" id="hasta" class="date-input">
+  <input type="date" id="hasta" class="date-input" aria-label="Fecha de fin del período">
   <button class="filter-btn" onclick="applyFilter()">Aplicar</button>
   <div class="quick-filters">
     <button class="qf" data-qf="mes"  onclick="setQuickFilter('mes')">Mes</button>

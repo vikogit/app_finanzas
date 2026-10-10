@@ -43,9 +43,9 @@
 
 <form method="GET" class="filter-bar">
   <span class="filter-label">Período</span>
-  <input type="date" name="desde" class="date-input" value="{{ desde }}">
+  <input type="date" name="desde" class="date-input" value="{{ desde }}" aria-label="Filtrar desde la fecha">
   <span class="filter-sep">→</span>
-  <input type="date" name="hasta" class="date-input" value="{{ hasta }}">
+  <input type="date" name="hasta" class="date-input" value="{{ hasta }}" aria-label="Filtrar hasta la fecha">
   <input type="hidden" name="tipo" value="{{ tipo }}">
   <input type="hidden" name="categoria" value="{{ categoria }}">
   <input type="hidden" name="descripcion" value="{{ descripcion }}">
@@ -76,7 +76,7 @@
           <th class="th-filter {{ 'active' if descripcion }}">
             <span class="th-label" onclick="toggleColFilter('descripcion', event)" ondblclick="clearColFilter('descripcion', event)">Descripción <span class="caret">▾</span></span>
             <div class="col-filter-dropdown" id="dropdown-descripcion" style="display:none" onclick="event.stopPropagation()">
-              <input type="text" class="form-input" placeholder="Buscar..." value="{{ descripcion }}"
+              <input type="text" class="form-input" placeholder="Buscar..." aria-label="Buscar en la descripción" value="{{ descripcion }}"
                      onkeydown="if(event.key==='Enter'){setColFilter('descripcion', this.value)}">
             </div>
           </th>

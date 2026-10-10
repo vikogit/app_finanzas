@@ -11,3 +11,6 @@ __pycache__/
 # Archivos del sistema
 .DS_Store
 Thumbs.db
+# Base de datos de pruebas y logs locales
+tests/*.db
+tests/*.log

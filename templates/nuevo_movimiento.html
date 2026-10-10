@@ -152,10 +152,10 @@
     <div class="form-field" id="necesidades-meta-block" style="display:none">
       <span class="form-label">Meta mensual de necesidades</span>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-        <input type="month" id="necesidades-meta-mes" class="form-input" style="max-width:160px">
+        <input type="month" id="necesidades-meta-mes" class="form-input" style="max-width:160px" aria-label="Mes de la meta de necesidades">
         <div class="form-input-prefix" style="flex:0 0 auto">
           <span class="form-prefix">S/</span>
-          <input type="number" id="necesidades-meta-input" min="0" step="0.01"
+          <input type="number" id="necesidades-meta-input" min="0" step="0.01" aria-label="Monto de la meta de necesidades"
                  class="form-input" style="max-width:120px" placeholder="450.00">
         </div>
         <button type="button" class="btn-cancel" style="padding:9px 16px" onclick="guardarMetaNecesidades()">Guardar</button>
@@ -167,10 +167,10 @@
     <div class="form-field" id="diversion-meta-block" style="display:none">
       <span class="form-label">Meta mensual de diversión</span>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-        <input type="month" id="diversion-meta-mes" class="form-input" style="max-width:160px">
+        <input type="month" id="diversion-meta-mes" class="form-input" style="max-width:160px" aria-label="Mes de la meta de diversión">
         <div class="form-input-prefix" style="flex:0 0 auto">
           <span class="form-prefix">S/</span>
-          <input type="number" id="diversion-meta-input" min="0" step="0.01"
+          <input type="number" id="diversion-meta-input" min="0" step="0.01" aria-label="Monto de la meta de diversión"
                  class="form-input" style="max-width:120px" placeholder="200.00">
         </div>
         <button type="button" class="btn-cancel" style="padding:9px 16px" onclick="guardarMetaDiversion()">Guardar</button>
@@ -182,8 +182,8 @@
     <div class="form-field" id="dias-trabajo-block" style="display:none">
       <span class="form-label">Meta de días trabajados al mes</span>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-        <input type="month" id="dias-trabajo-mes" class="form-input" style="max-width:160px">
-        <input type="number" id="dias-trabajo-input" min="1" max="31" step="1"
+        <input type="month" id="dias-trabajo-mes" class="form-input" style="max-width:160px" aria-label="Mes de la meta de días trabajados">
+        <input type="number" id="dias-trabajo-input" min="1" max="31" step="1" aria-label="Días trabajados al mes"
                class="form-input" style="max-width:100px" placeholder="20">
         <button type="button" class="btn-cancel" style="padding:9px 16px" onclick="guardarDiasTrabajo()">Guardar</button>
         <span id="dias-trabajo-feedback" style="font-size:12px"></span>
@@ -211,7 +211,7 @@
         <button type="button" class="asset-back" onclick="backToStep1()">← Atrás</button>
         <span class="asset-step-hint" id="asset-step2-hint">Paso 2 — Elige el activo</span>
         <div class="pill-group" id="asset-sub-btns"></div>
-        <input type="text" id="asset-custom-input" class="form-input"
+        <input type="text" id="asset-custom-input" class="form-input" aria-label="Nombre del activo"
                placeholder="Nombre del activo..." style="display:none; margin-top:10px;">
       </div>
 
