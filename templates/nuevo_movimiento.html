@@ -804,17 +804,17 @@
       const monto = document.getElementById('importe').value;
       if (!desde || !hasta) {
         e.preventDefault();
-        alert('Por favor completa las fechas de inicio y fin de la meta.');
+        mostrarAviso('Por favor completa las fechas de inicio y fin de la meta.');
         return;
       }
       if (hasta < desde) {
         e.preventDefault();
-        alert('La fecha "Hasta" no puede ser anterior a "Desde".');
+        mostrarAviso('La fecha "Hasta" no puede ser anterior a "Desde".');
         return;
       }
       if (!monto || parseFloat(monto) <= 0) {
         e.preventDefault();
-        alert('Por favor ingresa un monto de meta diaria mayor a 0.');
+        mostrarAviso('Por favor ingresa un monto de meta diaria mayor a 0.');
         return;
       }
       return;
@@ -823,7 +823,7 @@
       const area = document.getElementById('investment_asset_type').value;
       if (!area) {
         e.preventDefault();
-        alert('Por favor selecciona el área de capacitación (Paso 1).');
+        mostrarAviso('Por favor selecciona el área de capacitación (Paso 1).');
         return;
       }
     }
@@ -833,17 +833,17 @@
     const imp       = document.getElementById('importe').value;
     if (!assetType) {
       e.preventDefault();
-      alert('Por favor selecciona el tipo de activo (Paso 1).');
+      mostrarAviso('Por favor selecciona el tipo de activo (Paso 1).');
       return;
     }
     if (!assetName) {
       e.preventDefault();
-      alert('Por favor especifica el activo (Paso 2).');
+      mostrarAviso('Por favor especifica el activo (Paso 2).');
       return;
     }
     if (!imp || parseFloat(imp) <= 0) {
       e.preventDefault();
-      alert('Por favor ingresa el importe en USD.');
+      mostrarAviso('Por favor ingresa el importe en USD.');
       return;
     }
     // Usar el nombre del activo como descripción

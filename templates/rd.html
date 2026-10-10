@@ -163,9 +163,6 @@
 <script>
 let chartCumplimiento = null, chartFlujo = null, chartArea = null;
 
-function fmtMoney(v) {
-  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
 
 function epochToDate(epochDay) {
   return new Date(epochDay * 86400000);

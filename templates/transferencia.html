@@ -39,7 +39,7 @@
         {% for cat in origen_categorias %}
         <div class="pill-radio">
           <input type="radio" id="origen-{{ loop.index }}" name="origen" value="{{ cat }}" {% if loop.first %}checked{% endif %}>
-          <label for="origen-{{ loop.index }}">{{ 'R &amp; D' if cat == 'R&D' else cat }}</label>
+          <label for="origen-{{ loop.index }}">{{ 'R & D' if cat == 'R&D' else cat }}</label>
         </div>
         {% endfor %}
       </div>
@@ -55,7 +55,7 @@
         {% for cat in destino_categorias %}
         <div class="pill-radio">
           <input type="radio" id="destino-{{ loop.index }}" name="destino" value="{{ cat }}" {% if loop.index == 2 %}checked{% endif %}>
-          <label for="destino-{{ loop.index }}">{{ 'R &amp; D' if cat == 'R&D' else cat }}</label>
+          <label for="destino-{{ loop.index }}">{{ 'R & D' if cat == 'R&D' else cat }}</label>
         </div>
         {% endfor %}
       </div>
@@ -90,9 +90,6 @@
   document.getElementById('fecha').value = localDateStr(new Date());
 
   function catLabel(v) { return v === 'R&D' ? 'R & D' : v; }
-  function fmtMoney(v) {
-    return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-  }
 
   function updatePreview() {
     const origen  = document.querySelector('input[name="origen"]:checked')?.value;
@@ -124,13 +121,13 @@
     const destino = document.querySelector('input[name="destino"]:checked')?.value;
     if (origen === destino) {
       e.preventDefault();
-      alert('Elige dos categorías distintas para la transferencia.');
+      mostrarAviso('Elige dos categorías distintas para la transferencia.');
       return;
     }
     const monto = parseFloat(document.getElementById('monto').value);
     if (!monto || monto <= 0) {
       e.preventDefault();
-      alert('Ingresa un monto mayor a 0.');
+      mostrarAviso('Ingresa un monto mayor a 0.');
     }
   });
 

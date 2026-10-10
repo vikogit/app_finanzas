@@ -271,9 +271,6 @@ if (window.ChartZoom) Chart.register(window.ChartZoom);
 
 let chartEarnings = null, chartFuentes = null;
 
-function fmtMoney(v) {
-  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
 
 function epochToDate(epochDay) {
   return new Date(epochDay * 86400000);

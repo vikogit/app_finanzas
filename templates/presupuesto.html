@@ -222,9 +222,6 @@ const PRESU_SUB_COLOR = {
   gasto_fijo: '#f87171', gasto_variable: '#fb7185', deuda: '#60a5fa',
 };
 
-function fmtMoney(v) {
-  return 'S/ ' + Number(v).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
 
 function rowHtml(categoria, item) {
   return `
@@ -355,7 +352,7 @@ function addItem(categoria) {
       const firstInput = wrap.querySelector('.presu-row:last-child .presu-input-nombre');
       if (firstInput) { firstInput.focus(); firstInput.select(); }
     })
-    .catch(e => alert(e.message));
+    .catch(e => mostrarAviso(e.message));
 }
 
 function saveItem(id, el) {
@@ -364,7 +361,7 @@ function saveItem(id, el) {
   const monto = parseFloat(row.querySelector('.presu-input-monto').value);
 
   if (!nombre || isNaN(monto) || monto < 0) {
-    alert('Ingresa un nombre y un monto válido (no negativo).');
+    mostrarAviso('Ingresa un nombre y un monto válido (no negativo).');
     loadPresupuesto();
     return;
   }
@@ -385,7 +382,7 @@ function saveItem(id, el) {
         if (el2) el2.textContent = fmtMoney(data.totales[cat] || 0);
       });
     })
-    .catch(e => { alert(e.message); loadPresupuesto(); });
+    .catch(e => { mostrarAviso(e.message); loadPresupuesto(); });
 }
 
 function deleteItem(id) {

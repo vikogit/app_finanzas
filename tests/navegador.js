@@ -142,7 +142,20 @@ async function entrar(page) {
     check(`${n} no ejecuta HTML de la descripción`, !(await page.evaluate(() => window.__xss === 1)), 'XSS');
   }
 
-  console.log('\n=== 6. Accesibilidad ===');
+  console.log('\n=== 6. Texto: sin entidades HTML a la vista ===');
+  // Un "&amp;" escrito a mano dentro de una expresión Jinja se escapa dos
+  // veces y el usuario termina leyendo "R &amp; D" en pantalla.
+  for (const [n, u] of [['transferencia', '/transferencia'], ['movimientos', '/movimientos'],
+                        ['nuevo', '/nuevo'], ['resumen', '/dashboard']]) {
+    actual = n;
+    await page.goto(BASE + u, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    const crudas = await page.evaluate(() =>
+      (document.body.innerText.match(/&(amp|lt|gt|quot|#\d+);/g) || []).slice(0, 3));
+    check(`${n}: sin entidades HTML visibles`, crudas.length === 0, crudas.join(', '));
+  }
+
+  console.log('\n=== 7. Accesibilidad ===');
   for (const [n, u] of [['necesidades', '/dashboard/necesidades'], ['nuevo', '/nuevo'],
                         ['movimientos', '/movimientos'], ['presupuesto', '/dashboard/presupuesto']]) {
     actual = n;
@@ -159,7 +172,7 @@ async function entrar(page) {
   }
   await ctx.close();
 
-  console.log('\n=== 7. Móvil (390x844) ===');
+  console.log('\n=== 8. Móvil (390x844) ===');
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const mp = await mob.newPage();
   mp.on('pageerror', e => problemas.push(['móvil', 'EXCEPCIÓN JS', String(e).slice(0, 150)]));
@@ -172,7 +185,7 @@ async function entrar(page) {
   }
   await mob.close();
 
-  console.log('\n=== 8. Modo claro ===');
+  console.log('\n=== 9. Modo claro ===');
   const luz = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const lp = await luz.newPage();
   lp.on('pageerror', e => problemas.push(['claro', 'EXCEPCIÓN JS', String(e).slice(0, 150)]));

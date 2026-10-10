@@ -120,9 +120,6 @@
 
 {% block scripts %}
 <script>
-function fmtMoney(v) {
-  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
 
 function fmtFecha(iso) {
   const [y, m, d] = iso.split('-');
@@ -269,7 +266,7 @@ function eliminarPago(id, origen) {
   req.then(r => {
     if (!r.ok) throw new Error('No se pudo eliminar el pago');
     loadTarjeta();
-  }).catch(e => alert(e.message));
+  }).catch(e => mostrarAviso(e.message));
 }
 
 window.addEventListener('DOMContentLoaded', loadTarjeta);

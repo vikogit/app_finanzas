@@ -138,9 +138,6 @@
 <script>
 let chartTendencia = null, chartDonut = null;
 
-function fmtMoney(v) {
-  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
 
 function renderTendencia(tendencia) {
   const ctx = document.getElementById('chartTendencia').getContext('2d');

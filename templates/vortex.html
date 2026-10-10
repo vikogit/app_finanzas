@@ -129,9 +129,6 @@
 <script>
 let chartArea = null, chartDonutAlumno = null, chartBar = null, chartDonutGasto = null;
 
-function fmtMoney(v) {
-  return 'S/ ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
 
 function renderBarVortex(porMes) {
   const ctx = document.getElementById('chartBar').getContext('2d');
