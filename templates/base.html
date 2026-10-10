@@ -458,6 +458,23 @@
     }
     .btn-cancel:hover { color: var(--text); background: var(--border); }
 
+    /* ─── Esqueleto mientras cargan los datos ─── */
+    .kpi-value.cargando, .resultado-val.cargando {
+      color: transparent !important; border-radius: 7px; min-height: 1em;
+      background: linear-gradient(90deg,
+        var(--bg-card2) 25%, var(--border) 50%, var(--bg-card2) 75%);
+      background-size: 200% 100%;
+      animation: cargando-brillo 1.3s ease-in-out infinite;
+    }
+    @keyframes cargando-brillo {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    /* Quien pidió menos movimiento ve el esqueleto quieto, no parpadeando. */
+    @media (prefers-reduced-motion: reduce) {
+      .kpi-value.cargando, .resultado-val.cargando { animation: none; background: var(--bg-card2); }
+    }
+
     /* ─── Resumen y paginado del listado de movimientos ─── */
     .mov-resumen {
       display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
@@ -829,12 +846,37 @@
     if (banner) banner.remove();
   }
 
+  /* Mientras llegan los datos, los KPIs mostraban "S/ —" sin más. En Render
+     la instancia puede estar dormida y tardar bastante, así que ahora los
+     valores parpadean como esqueleto y, si tarda de verdad, se avisa. */
+  function marcarCargando(activo) {
+    document.querySelectorAll('.kpi-value, .resultado-val')
+      .forEach(e => e.classList.toggle('cargando', activo));
+  }
+
+  let _pendientes = 0, _avisoLento = null;
+
   async function cargarJSON(url) {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`El servidor respondió ${r.status}`);
-    const data = await r.json();
-    ocultarErrorCarga();
-    return data;
+    if (_pendientes === 0) {
+      marcarCargando(true);
+      _avisoLento = setTimeout(() => {
+        mostrarErrorCarga('El servidor está despertando, esto puede tardar unos segundos…');
+      }, 4000);
+    }
+    _pendientes++;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`El servidor respondió ${r.status}`);
+      const data = await r.json();
+      ocultarErrorCarga();
+      return data;
+    } finally {
+      _pendientes--;
+      if (_pendientes === 0) {
+        clearTimeout(_avisoLento);
+        marcarCargando(false);
+      }
+    }
   }
 
   /* ─── Fecha inicial por defecto de cada dashboard ───
