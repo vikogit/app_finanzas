@@ -94,23 +94,36 @@ async function entrar(page) {
   await page.waitForTimeout(400);
   check('convierte USD a soles', parseFloat(await page.inputValue('#importe')) > 25);
 
-  console.log('\n=== 4. Metas: crear rango y eliminar ===');
-  actual = 'metas';
-  await page.goto(`${BASE}/dashboard/diversion`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(900);
-  const mAntes = await page.locator('#metas-body tr').count();
-  await page.click('button:has-text("Nueva meta")');
-  await page.waitForTimeout(300);
-  await page.fill('#meta-desde', '2027-01');
-  await page.fill('#meta-hasta', '2027-03');
-  await page.fill('#meta-monto', '333');
-  await page.click('button:has-text("Guardar meta")');
-  await page.waitForTimeout(1200);
-  const mDespues = await page.locator('#metas-body tr').count();
-  check('crear meta por rango (3 meses)', mDespues === mAntes + 3, `${mAntes} -> ${mDespues}`);
-  await page.locator('#metas-body button[title="Eliminar"]').first().click();
-  await page.waitForTimeout(1100);
-  check('eliminar meta', (await page.locator('#metas-body tr').count()) === mDespues - 1);
+  console.log('\n=== 4. Metas: crear rango y eliminar (los 4 dashboards) ===');
+  // Año irrepetible por ejecución: la BD de pruebas persiste y, si se
+  // reutilizara el mismo rango, el alta sería un upsert y no sumaría filas.
+  const anio = 2050 + Math.floor(Math.random() * 40);
+  for (const [nombre, url] of [['necesidades', '/dashboard/necesidades'], ['diversion', '/dashboard/diversion'],
+                               ['inversion', '/dashboard/inversion'], ['rd', '/dashboard/rd']]) {
+    actual = `metas-${nombre}`;
+    await page.goto(BASE + url, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(900);
+    const mAntes = await page.locator('#metas-body tr').count();
+
+    await page.click('button:has-text("Nueva meta")');
+    await page.waitForTimeout(300);
+    await page.fill('#meta-desde', `${anio}-01`);
+    await page.fill('#meta-hasta', `${anio}-03`);
+    await page.fill('#meta-monto', '333');
+    await page.click('button:has-text("Guardar meta")');
+    await page.waitForTimeout(1200);
+    const mDespues = await page.locator('#metas-body tr').count();
+    check(`${nombre}: crear rango de 3 meses`, mDespues === mAntes + 3, `${mAntes} -> ${mDespues}`);
+
+    // Borrar las 3 recién creadas deja la tabla como estaba (prueba repetible).
+    for (let k = 0; k < 3; k++) {
+      await page.locator('#metas-body button[title="Eliminar"]').first().click();
+      await page.waitForTimeout(700);
+    }
+    check(`${nombre}: eliminar deja la tabla como estaba`,
+          (await page.locator('#metas-body tr').count()) === mAntes,
+          `quedaron ${await page.locator('#metas-body tr').count()}, esperaba ${mAntes}`);
+  }
 
   console.log('\n=== 5. Seguridad: XSS en descripciones ===');
   actual = 'xss';

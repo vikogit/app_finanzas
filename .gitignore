@@ -14,3 +14,4 @@ Thumbs.db
 # Base de datos de pruebas y logs locales
 tests/*.db
 tests/*.log
+tests/capturas/

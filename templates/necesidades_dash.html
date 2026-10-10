@@ -3,37 +3,8 @@
 
 {% block content %}
 <style>
-  .metas-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-  .btn-add-meta {
-    display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:9px;
-    font-size:12px; font-weight:600; color:#fff; cursor:pointer; border:none; font-family:inherit;
-    background:linear-gradient(135deg,#6366f1,#4f46e5);
-  }
-  .btn-add-meta:hover { opacity:.88; }
-  .meta-actions { display:flex; gap:6px; justify-content:flex-end; }
-  .meta-icon-btn {
-    width:26px; height:26px; border-radius:7px; border:1px solid var(--border); background:var(--input-bg);
-    color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
-    transition:color .15s, background .15s;
-  }
-  .meta-icon-btn:hover { color:var(--text); background:var(--bg-card2); }
-  .meta-icon-btn.danger:hover { color:#ef4444; background:rgba(239,68,68,0.1); }
-
-  .modal-overlay {
-    position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(3px);
-    display:none; align-items:center; justify-content:center; z-index:200; padding:20px;
-  }
-  .modal-overlay.open { display:flex; }
-  .modal-card {
-    background:var(--bg-card); border:1px solid var(--kpi-border); border-radius:18px;
-    padding:26px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.4);
-  }
-  html:not(.dark) .modal-card { background:#ffffff; }
-  .modal-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:4px; }
-  .modal-sub { font-size:12px; color:var(--text-muted); margin-bottom:18px; }
-  .modal-error { font-size:12px; color:#f87171; margin-bottom:10px; min-height:0; }
-  .modal-row { display:flex; gap:10px; }
-  .modal-row .form-field { flex:1; }
+  /* Acento de las metas (estilos compartidos en base.html) */
+  .metas-hdr, .btn-add-meta { --meta-acento: #818cf8; --meta-acento-2: #4f46e5; --meta-texto: #fff; }
 </style>
 
 <div class="page-hdr">
@@ -239,114 +210,10 @@ function renderTendencia(tendencia) {
   });
 }
 
-function loadMetas() {
-  fetch('/api/necesidades/metas')
-    .then(r => r.json())
-    .then(metas => {
-      const tbody = document.getElementById('metas-body');
-      const empty = document.getElementById('metas-empty');
-      tbody.innerHTML = '';
-      if (!metas.length) { empty.style.display = 'block'; return; }
-      empty.style.display = 'none';
-      metas.forEach(m => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="muted">${m.mes_label}</td>
-          <td class="right" style="font-weight:700;color:#818cf8">${fmtMoney(m.monto_meta)}</td>
-          <td class="right">
-            <div class="meta-actions">
-              <button class="meta-icon-btn" title="Editar" onclick='openMetaModal(${JSON.stringify(m)})'>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-              </button>
-              <button class="meta-icon-btn danger" title="Eliminar" onclick="deleteMeta(${m.id})">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9M4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M6.31 5.393c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m3.09 0a48.667 48.667 0 013.478.397"/></svg>
-              </button>
-            </div>
-          </td>`;
-        tbody.appendChild(tr);
-      });
-    });
-}
 
-function openMetaModal(meta) {
-  document.getElementById('meta-modal-error').textContent = '';
-  const hastaWrap = document.getElementById('meta-hasta-wrap');
-  const sub = document.getElementById('meta-modal-sub');
-  if (meta) {
-    document.getElementById('meta-modal-title').textContent = 'Editar meta';
-    document.getElementById('meta-id').value = meta.id;
-    const mesVal = `${meta.year}-${String(meta.month).padStart(2,'0')}`;
-    document.getElementById('meta-desde').value = mesVal;
-    document.getElementById('meta-hasta').value = mesVal;
-    document.getElementById('meta-monto').value = meta.monto_meta;
-    hastaWrap.style.display = 'none';
-    sub.textContent = 'Edita el monto de la meta para este mes.';
-  } else {
-    document.getElementById('meta-modal-title').textContent = 'Nueva meta';
-    document.getElementById('meta-id').value = '';
-    const actual = localYearMonthStr(new Date());
-    document.getElementById('meta-desde').value = actual;
-    document.getElementById('meta-hasta').value = actual;
-    document.getElementById('meta-monto').value = '';
-    hastaWrap.style.display = '';
-    sub.textContent = 'Define un rango de meses y el monto de la meta — se aplicará a cada mes del rango. Se dibuja como línea celeste sobre el gráfico.';
-  }
-  document.getElementById('meta-modal').classList.add('open');
-}
 
-function closeMetaModal() {
-  document.getElementById('meta-modal').classList.remove('open');
-}
 
-function saveMeta() {
-  const id       = document.getElementById('meta-id').value;
-  const desdeVal = document.getElementById('meta-desde').value;
-  const hastaVal = id ? desdeVal : document.getElementById('meta-hasta').value;
-  const monto    = document.getElementById('meta-monto').value;
-  const errBox   = document.getElementById('meta-modal-error');
 
-  if (!desdeVal || !hastaVal || !monto || parseFloat(monto) <= 0) {
-    errBox.textContent = 'Completa el rango de meses y un monto mayor a 0.';
-    return;
-  }
-  if (hastaVal < desdeVal) {
-    errBox.textContent = "La fecha 'Hasta' no puede ser anterior a 'Desde'.";
-    return;
-  }
-
-  let payload, url, method;
-  if (id) {
-    const [year, month] = desdeVal.split('-').map(Number);
-    payload = { year, month, monto_meta: parseFloat(monto) };
-    url = `/api/necesidades/metas/${id}`;
-    method = 'PUT';
-  } else {
-    payload = { desde: desdeVal, hasta: hastaVal, monto_meta: parseFloat(monto) };
-    url = '/api/necesidades/metas';
-    method = 'POST';
-  }
-
-  fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
-    .then(async r => {
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Error al guardar la meta');
-      closeMetaModal();
-      loadMetas();
-      const d = getCurrentRange();
-      loadData(d.desde, d.hasta);
-    })
-    .catch(e => { errBox.textContent = e.message; });
-}
-
-function deleteMeta(id) {
-  if (!confirm('¿Seguro que deseas eliminar esta meta?')) return;
-  fetch(`/api/necesidades/metas/${id}`, { method: 'DELETE' })
-    .then(() => {
-      loadMetas();
-      const d = getCurrentRange();
-      loadData(d.desde, d.hasta);
-    });
-}
 
 function getCurrentRange() {
   return { desde: document.getElementById('desde').value, hasta: document.getElementById('hasta').value };
@@ -388,7 +255,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('desde').value = desde;
   document.getElementById('hasta').value = hasta;
   loadData(desde, hasta);
-  loadMetas();
+  initMetasMensuales({ recurso: 'necesidades', acento: '#818cf8' });
 
   document.getElementById('meta-modal').addEventListener('click', (e) => {
     if (e.target.id === 'meta-modal') closeMetaModal();
