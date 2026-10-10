@@ -187,6 +187,29 @@ def main():
         r = c.post("/transferencia", data=datos)
         check(f"rechaza: {nombre}", r.status_code == 200 and b"Error" in r.data, f"status={r.status_code}")
 
+    print("\n=== 9b. Paginado del listado ===")
+    with appmod.app.app_context():
+        # Supera el tamaño de página para forzar más de una
+        appmod.db.session.add_all([
+            appmod.Movimiento(fecha=dt.date(2026, 6, 1), tipo="Gasto", categoria="Diversión",
+                              descripcion=f"Relleno {i}", importe=1 + i)
+            for i in range(appmod.POR_PAGINA + 20)
+        ])
+        appmod.db.session.commit()
+        total_bd = appmod.Movimiento.query.count()
+
+    html = c.get("/movimientos").data.decode("utf-8")
+    filas = html.count('<td class="muted" style="white-space:nowrap">')
+    check(f"la página 1 no excede {appmod.POR_PAGINA} filas", filas <= appmod.POR_PAGINA, f"{filas} filas")
+    check("muestra el total de movimientos", str(total_bd) in html, f"no aparece {total_bd}")
+    check("muestra controles de paginado", "paginador" in html)
+    p2 = c.get("/movimientos?pagina=2").data.decode("utf-8")
+    check("la página 2 trae filas distintas", p2 != html)
+    check("pagina fuera de rango no rompe", c.get("/movimientos?pagina=9999").status_code == 200)
+    check("pagina no numérica no rompe", c.get("/movimientos?pagina=abc").status_code == 200)
+    check("el resumen suma TODO el filtro, no solo la página",
+          "Balance" in html, "falta la línea de balance")
+
     print("\n=== 10. CRUD de presupuesto ===")
     r = c.post("/api/presupuesto/items", json={"categoria": "ingreso_fijo", "nombre": "Sueldo", "monto": 2000})
     check("crear ítem", r.status_code == 201, f"status={r.status_code}")

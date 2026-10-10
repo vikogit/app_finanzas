@@ -631,6 +631,9 @@ def transferencia():
     )
 
 
+POR_PAGINA = 100
+
+
 @app.route("/movimientos")
 @login_requerido
 def ver_movimientos():
@@ -658,11 +661,33 @@ def ver_movimientos():
     if descripcion_raw:
         q = q.filter(Movimiento.descripcion.ilike(f"%{descripcion_raw}%"))
 
-    movimientos = q.order_by(Movimiento.id.desc()).all()
+    # Totales del filtro completo (no solo de la página que se está viendo).
+    resumen = {"ingresos": 0.0, "gastos": 0.0, "fondo": 0.0}
+    for m in q.with_entities(Movimiento.tipo, Movimiento.importe).all():
+        clave = {"Ingreso": "ingresos", "Gasto": "gastos", "Fondo": "fondo"}.get(m.tipo)
+        if clave:
+            resumen[clave] += float(m.importe)
+    resumen = {k: round(v, 2) for k, v in resumen.items()}
+    resumen["balance"] = round(resumen["ingresos"] - resumen["gastos"], 2)
+
+    # Paginado: sin esto la página crecía sin límite (un par de años de uso
+    # son miles de filas, y todas se enviaban en cada carga).
+    total = q.count()
+    try:
+        pagina = max(1, int(request.args.get("pagina", 1)))
+    except (TypeError, ValueError):
+        pagina = 1
+    paginas = max(1, (total + POR_PAGINA - 1) // POR_PAGINA)
+    pagina = min(pagina, paginas)
+
+    movimientos = (q.order_by(Movimiento.id.desc())
+                    .limit(POR_PAGINA).offset((pagina - 1) * POR_PAGINA).all())
+
     return render_template(
         "movimientos.html", movimientos=movimientos,
         desde=desde_raw, hasta=hasta_raw,
         tipo=tipo_raw, categoria=categoria_raw, descripcion=descripcion_raw,
+        resumen=resumen, total=total, pagina=pagina, paginas=paginas,
     )
 
 
