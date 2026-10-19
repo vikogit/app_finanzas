@@ -52,6 +52,26 @@ Abre la app de verdad en Chromium y revisa ~80 puntos:
 - móvil a 390 px: ninguna página con scroll horizontal;
 - modo claro.
 
+## 3. Migración — `migracion.py`
+
+```bash
+python tests/migracion.py
+```
+
+Sin servidor ni dependencias extra, sobre una base temporal. Arma una tabla
+`movimientos` con el esquema viejo y una fila dentro, arranca la app encima y
+comprueba que:
+
+- el arranque agrega las columnas que le faltan a la tabla;
+- no se pierde la fila que ya estaba (y queda como "sin dinero apartado");
+- las páginas y APIs que consultan movimientos vuelven a responder 200;
+- aplicarlo de nuevo no toca nada (es idempotente) ni pisa lo guardado;
+- la tabla migrada termina con todas las columnas del modelo.
+
+Es la red contra el fallo que tiró producción: agregar una columna al modelo
+y desplegar sin que la base la tenga. Si agregas una columna nueva, anótala en
+`COLUMNAS_AGREGADAS` (en `app.py`) y corre esta suite.
+
 ## Datos de ejemplo
 
 `servidor_pruebas.py` rehace la base en cada arranque con movimientos de

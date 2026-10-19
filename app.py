@@ -231,6 +231,46 @@ def seed_presupuesto_si_vacio():
     db.session.commit()
 
 
+# ── esquema de la base de datos ───────────────────────────────────────
+# Columnas que se agregaron al modelo cuando la tabla ya existía en producción
+# con datos: db.create_all() no las añade (la tabla ya está), hay que pedirlas
+# aparte. Al agregar una columna nueva al modelo, anotarla también aquí.
+COLUMNAS_AGREGADAS = [
+    ("movimientos", "pagado_con_tarjeta", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("movimientos", "dinero_separado",    "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("movimientos", "dinero_separado_el", "DATE"),
+]
+
+
+def aplicar_esquema():
+    """Crea las tablas que falten y agrega las columnas nuevas. Idempotente.
+
+    Devuelve una nota por cada paso, para mostrarlas o registrarlas. Consulta
+    el catálogo de la base antes de tocarla, así que no depende de la sintaxis
+    IF NOT EXISTS (que es de Postgres y no existe en sqlite).
+    """
+    notas = []
+    db.create_all()
+    notas.append("tablas verificadas")
+
+    inspector = db.inspect(db.engine)
+    tablas = set(inspector.get_table_names())
+    columnas = {t: {c["name"] for c in inspector.get_columns(t)} for t in tablas}
+
+    for tabla, columna, tipo in COLUMNAS_AGREGADAS:
+        if tabla not in tablas or columna in columnas[tabla]:
+            continue
+        try:
+            db.session.execute(db.text(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}"))
+            db.session.commit()
+            notas.append(f"columna {tabla}.{columna} agregada")
+        except Exception as e:
+            # Otro worker pudo ganar la carrera: no abortar las demás columnas.
+            db.session.rollback()
+            notas.append(f"columna {tabla}.{columna} omitida ({type(e).__name__})")
+    return notas
+
+
 # ── validación de movimientos ─────────────────────────────────────────
 # Fuente única de verdad: cualquier categoría o tipo fuera de estas listas
 # queda huérfano (no lo suma ningún dashboard), así que se rechaza al guardar.
@@ -758,32 +798,13 @@ def editar_movimiento(id):
 @app.route("/crear-tabla")
 @login_requerido
 def crear_tabla():
-    notas = []
+    # El esquema ya se aplica solo al arrancar la app; esta ruta queda como
+    # respaldo manual y para sembrar el presupuesto.
     try:
-        db.create_all()
-        notas.append("Tablas creadas/verificadas")
+        notas = aplicar_esquema()
     except Exception as e:
         db.session.rollback()
-        return f"Error creando tablas: {e}", 500
-
-    # db.create_all() solo crea tablas nuevas — "movimientos" ya existe con
-    # datos, así que la columna nueva se agrega aparte (idempotente). La
-    # sintaxis IF NOT EXISTS es de Postgres; en SQLite (desarrollo) la tabla
-    # ya nace con la columna, así que un fallo aquí no debe abortar el resto.
-    columnas = [
-        ("pagado_con_tarjeta", "BOOLEAN NOT NULL DEFAULT FALSE"),
-        ("dinero_separado",    "BOOLEAN NOT NULL DEFAULT FALSE"),
-        ("dinero_separado_el", "DATE"),
-    ]
-    for nombre, tipo in columnas:
-        try:
-            db.session.execute(db.text(
-                f"ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS {nombre} {tipo}"))
-            db.session.commit()
-            notas.append(f"Columna {nombre} verificada")
-        except Exception as e:
-            db.session.rollback()
-            notas.append(f"{nombre} omitida ({type(e).__name__})")
+        return f"Error aplicando el esquema: {e}", 500
 
     try:
         seed_presupuesto_si_vacio()
@@ -2020,6 +2041,25 @@ def _tipo_cambio_actual():
 def api_tipo_cambio():
     rate = _tipo_cambio_actual()
     return jsonify({"rate": rate}) if rate else (jsonify({"error": "no disponible"}), 503)
+
+
+def _preparar_base_de_datos():
+    """Aplica el esquema al arrancar, antes de atender la primera petición.
+
+    Sin esto, un despliegue que agrega una columna al modelo deja la app rota
+    (toda consulta a esa tabla falla) hasta que alguien entra a mano a
+    /crear-tabla. Si la base no responde se registra y se sigue: abortar aquí
+    dejaría el servicio entero sin arrancar.
+    """
+    try:
+        with app.app_context():
+            for nota in aplicar_esquema():
+                print(f"[esquema] {nota}", flush=True)
+    except Exception as e:
+        print(f"[esquema] no se pudo preparar la base: {type(e).__name__}: {e}", flush=True)
+
+
+_preparar_base_de_datos()
 
 
 if __name__ == "__main__":
