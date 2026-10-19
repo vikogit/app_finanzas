@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.engine import make_url
 from config import Config
 from datetime import datetime, date as date_type, timedelta
 from zoneinfo import ZoneInfo
@@ -36,6 +37,28 @@ LOCAL_TZ = ZoneInfo("America/Lima")
 
 def hoy_local():
     return datetime.now(LOCAL_TZ).date()
+
+
+def sin_credenciales(error):
+    """Devuelve el texto del error sin la cadena de conexión ni su contraseña.
+
+    Los errores de la base suelen traer el DSN completo, y acá terminan en dos
+    sitios visibles: la respuesta que ve el administrador y el log de Render.
+    Se conserva el detalle (sirve para diagnosticar) pero no el secreto.
+    """
+    texto = str(error)
+    uri = app.config.get("SQLALCHEMY_DATABASE_URI") or ""
+    if not uri:
+        return texto
+    secretos = [uri]
+    try:
+        secretos.append(make_url(uri).password)
+    except Exception:
+        pass
+    for secreto in secretos:
+        if secreto:
+            texto = texto.replace(str(secreto), "***")
+    return texto
 
 
 def login_requerido(f):
@@ -640,7 +663,7 @@ def nuevo():
                 return redirect(url_for("dashboard_earnings"))
             except Exception as e:
                 db.session.rollback()
-                return f"Error al guardar: {str(e)}"
+                return f"Error al guardar: {sin_credenciales(e)}"
         try:
             db.session.add(Movimiento(**leer_movimiento_del_form(request.form)))
             db.session.commit()
@@ -650,7 +673,8 @@ def nuevo():
             return render_template("nuevo_movimiento.html", error=str(e)), 400
         except Exception as e:
             db.session.rollback()
-            return render_template("nuevo_movimiento.html", error=f"No se pudo guardar: {e}"), 500
+            return render_template(
+                "nuevo_movimiento.html", error=f"No se pudo guardar: {sin_credenciales(e)}"), 500
     return render_template("nuevo_movimiento.html")
 
 
@@ -688,7 +712,7 @@ def transferencia():
             return redirect(url_for("ver_movimientos"))
         except Exception as e:
             db.session.rollback()
-            return f"Error al guardar: {str(e)}"
+            return f"Error al guardar: {sin_credenciales(e)}"
     return render_template(
         "transferencia.html",
         origen_categorias=TRANSFER_ORIGEN_CATEGORIAS,
@@ -768,7 +792,7 @@ def eliminar_movimiento(id):
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        return f"Error al eliminar: {str(e)}", 500
+        return f"Error al eliminar: {sin_credenciales(e)}", 500
     if request.accept_mimetypes.best == "application/json" or request.is_json:
         return jsonify({"ok": True})
     return redirect(url_for("ver_movimientos"))
@@ -791,7 +815,9 @@ def editar_movimiento(id):
             return render_template("editar_movimiento.html", m=m, error=str(e)), 400
         except Exception as e:
             db.session.rollback()
-            return render_template("editar_movimiento.html", m=m, error=f"No se pudo guardar: {e}"), 500
+            return render_template(
+                "editar_movimiento.html", m=m,
+                error=f"No se pudo guardar: {sin_credenciales(e)}"), 500
     return render_template("editar_movimiento.html", m=m)
 
 
@@ -804,7 +830,7 @@ def crear_tabla():
         notas = aplicar_esquema()
     except Exception as e:
         db.session.rollback()
-        return f"Error aplicando el esquema: {e}", 500
+        return f"Error aplicando el esquema: {sin_credenciales(e)}", 500
 
     try:
         seed_presupuesto_si_vacio()
@@ -823,7 +849,7 @@ def test_db():
         db.session.execute(db.text("SELECT 1"))
         return "Conexión OK"
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error: {sin_credenciales(e)}"
 
 
 # ── API endpoints ─────────────────────────────────────────────────────
@@ -2056,7 +2082,8 @@ def _preparar_base_de_datos():
             for nota in aplicar_esquema():
                 print(f"[esquema] {nota}", flush=True)
     except Exception as e:
-        print(f"[esquema] no se pudo preparar la base: {type(e).__name__}: {e}", flush=True)
+        print(f"[esquema] no se pudo preparar la base: "
+              f"{type(e).__name__}: {sin_credenciales(e)}", flush=True)
 
 
 _preparar_base_de_datos()

@@ -122,6 +122,21 @@ def main():
     faltantes = modelo - set(columnas_de())
     check("la tabla migrada tiene todas las columnas del modelo", not faltantes, str(faltantes))
 
+    # ── 6. los errores de base no filtran la contraseña ──────────────
+    print("\n=== 6. Los errores de base no filtran credenciales ===")
+    # El DSN aparece en los errores de conexión, y esos errores se muestran al
+    # administrador y se imprimen en el log de Render.
+    uri_falsa = "postgresql://usuario:s3cr3t0@host.interno:5432/finanzas"
+    original = appmod.app.config["SQLALCHEMY_DATABASE_URI"]
+    appmod.app.config["SQLALCHEMY_DATABASE_URI"] = uri_falsa
+    try:
+        limpio = appmod.sin_credenciales(Exception(f"could not connect to {uri_falsa}: timeout"))
+    finally:
+        appmod.app.config["SQLALCHEMY_DATABASE_URI"] = original
+    check("oculta la contraseña del DSN", "s3cr3t0" not in limpio, limpio)
+    check("oculta el DSN completo", uri_falsa not in limpio, limpio)
+    check("conserva el detalle del error", "timeout" in limpio, limpio)
+
     print("\n" + "=" * 62)
     print(f"RESULTADO: {len(FALLOS)} fallos")
     for etiqueta, detalle in FALLOS:
