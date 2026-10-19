@@ -109,12 +109,91 @@ def main():
         kb = len(r.data) / 1024
         check(f"GET {p} < 100 KB", kb < 100, f"{kb:.0f} KB")
 
-    print("\n=== 4. Ciclos de tarjeta: el consumo cae dentro del rango mostrado ===")
+    print("\n=== 4. Ciclos de tarjeta (corte el 25, pago el 20 del mes siguiente) ===")
     with appmod.app.app_context():
-        for f in [dt.date(2026, 8, 22), dt.date(2026, 8, 5), dt.date(2026, 8, 21), dt.date(2026, 8, 20)]:
+        # Todo consumo debe caer dentro del rango del ciclo que se le asigna.
+        for f in [dt.date(2026, 8, 22), dt.date(2026, 8, 5), dt.date(2026, 8, 25),
+                  dt.date(2026, 8, 26), dt.date(2026, 1, 31), dt.date(2026, 12, 26)]:
             cid = appmod.ciclo_de_fecha(f)
             ini, cie, _ = appmod.ciclo_bounds(*cid)
             check(f"{f} dentro de {ini} → {cie}", ini <= f <= cie, "cae fuera del ciclo asignado")
+
+        # El 25 cierra ese mismo estado de cuenta; el 26 ya es del siguiente.
+        check("compra del 25 cierra ese mismo 25",
+              appmod.ciclo_id(*appmod.ciclo_de_fecha(dt.date(2026, 3, 25))) == "2026-03")
+        check("compra del 26 pasa al cierre siguiente",
+              appmod.ciclo_id(*appmod.ciclo_de_fecha(dt.date(2026, 3, 26))) == "2026-04")
+
+        # Los dos ejemplos que dio el usuario, tal cual.
+        _i, cie, ven = appmod.ciclo_bounds(2026, 3)
+        check("consumos 26-feb→25-mar vencen el 20-abr",
+              (cie, ven) == (dt.date(2026, 3, 25), dt.date(2026, 4, 20)), f"cierre={cie} vence={ven}")
+        _i, cie, ven = appmod.ciclo_bounds(2026, 9)
+        check("consumos 26-ago→25-sep vencen el 20-oct",
+              (cie, ven) == (dt.date(2026, 9, 25), dt.date(2026, 10, 20)), f"cierre={cie} vence={ven}")
+
+        # Cambio de año en ambos sentidos
+        check("el ciclo de enero arranca en diciembre del año anterior",
+              appmod.ciclo_bounds(2027, 1)[0] == dt.date(2026, 12, 26), str(appmod.ciclo_bounds(2027, 1)[0]))
+        check("el ciclo de diciembre vence en enero del año siguiente",
+              appmod.ciclo_bounds(2026, 12)[2] == dt.date(2027, 1, 20), str(appmod.ciclo_bounds(2026, 12)[2]))
+
+        # Ningún consumo puede quedar en dos ciclos ni fuera de todos
+        vistos = {}
+        for dia in range(1, 29):
+            for mes in (2, 3):
+                f = dt.date(2026, mes, dia)
+                cid = appmod.ciclo_de_fecha(f)
+                ini, cie, _ = appmod.ciclo_bounds(*cid)
+                vistos[f] = (ini <= f <= cie)
+        check("ningún día queda huérfano entre ciclos", all(vistos.values()),
+              f"{sum(1 for v in vistos.values() if not v)} días sin ciclo válido")
+
+    print("\n=== 4b. Check 'ya tengo el dinero' de cada consumo ===")
+    with appmod.app.app_context():
+        consumo = appmod.Movimiento.query.filter_by(categoria="Tarjeta", tipo="Gasto").first()
+        cid_consumo = consumo.id
+        check("un consumo nace sin dinero apartado", consumo.dinero_separado is False)
+
+    r = c.post(f"/api/tarjeta/consumos/{cid_consumo}/dinero", json={"separado": True})
+    check("marcar que tengo el dinero", r.status_code == 200, f"status={r.status_code}")
+    with appmod.app.app_context():
+        m = appmod.db.session.get(appmod.Movimiento, cid_consumo)
+        check("queda guardado en la BD", m.dinero_separado is True)
+        check("registra la fecha en que lo marqué", m.dinero_separado_el is not None)
+
+    r = c.post(f"/api/tarjeta/consumos/{cid_consumo}/dinero", json={"separado": False})
+    with appmod.app.app_context():
+        m = appmod.db.session.get(appmod.Movimiento, cid_consumo)
+        check("se puede desmarcar", m.dinero_separado is False and m.dinero_separado_el is None)
+
+    with appmod.app.app_context():
+        ingreso = appmod.Movimiento.query.filter_by(categoria="Colchón", tipo="Ingreso").first()
+        id_no_tarjeta = ingreso.id
+    r = c.post(f"/api/tarjeta/consumos/{id_no_tarjeta}/dinero", json={"separado": True})
+    check("rechaza marcar algo que no es consumo de tarjeta", r.status_code == 400, f"status={r.status_code}")
+    check("404 si el movimiento no existe",
+          c.post("/api/tarjeta/consumos/999999/dinero", json={"separado": True}).status_code == 404)
+
+    print("\n=== 4c. Filtro por ciclo y panel de pago ===")
+    d = c.get("/api/tarjeta").get_json()
+    check("devuelve el ciclo en curso por defecto", d["ciclo_sel"]["es_actual"] is True)
+    check("lista los consumos del ciclo", isinstance(d["ciclo_sel"]["consumos"], list))
+    check("ofrece ciclos para el selector", len(d["ciclos_disponibles"]) >= 1)
+    check("calcula salud", 0 <= d["salud"]["pct_cubierto"] <= 100, str(d["salud"]))
+    check("trae datos de los gráficos generales",
+          "por_ciclo" in d["general"] and "por_categoria" in d["general"])
+    otro = d["ciclos_disponibles"][-1]["id"]
+    d2 = c.get(f"/api/tarjeta?ciclo={otro}").get_json()
+    check("se puede filtrar por otro ciclo", d2["ciclo_sel"]["id"] == otro, d2["ciclo_sel"]["id"])
+    check("un ciclo inválido no rompe", c.get("/api/tarjeta?ciclo=basura").status_code == 200)
+    if d["por_pagar"]:
+        pp = d["por_pagar"]
+        check("el panel de pago vence un día 20", pp["vencimiento"].endswith("-20"), pp["vencimiento"])
+        check("muestra el monto en dólares", pp["monto_usd"] is not None or pp["tipo_cambio"] is None)
+        check("separa lo cubierto de lo que falta",
+              abs(pp["separado"] + pp["falta"] - pp["monto"]) < 0.02,
+              f"{pp['separado']} + {pp['falta']} != {pp['monto']}")
 
     print("\n=== 5. Reglas de negocio ===")
     inv = c.get(f"/api/inversion?{RANGO}").get_json()

@@ -58,6 +58,11 @@ class Movimiento(db.Model):
     investment_asset_type = db.Column(db.String(50),  nullable=True)
     investment_asset_name = db.Column(db.String(100), nullable=True)
     pagado_con_tarjeta   = db.Column(db.Boolean, nullable=False, default=False)
+    # Consumos con tarjeta: marca que ya tienes apartado el dinero de esa
+    # compra. Lo que no está marcado se ve en rojo y es lo que puede
+    # sorprenderte el día del pago.
+    dinero_separado      = db.Column(db.Boolean, nullable=False, default=False)
+    dinero_separado_el   = db.Column(db.Date, nullable=True)
 
 
 class PagoTarjeta(db.Model):
@@ -421,7 +426,13 @@ def ranking_por_descripcion(movs):
 # Corte el día 20: un ciclo agrupa consumos del 21 de un mes al 20 del
 # siguiente, con vencimiento de pago el 20 del mes subsiguiente
 # (ej. consumos del 21-jul al 20-ago vencen el 20-sep).
-CICLO_DIA_CORTE = 20
+CICLO_DIA_CORTE = 25   # el estado de cuenta cierra el 25 de cada mes
+CICLO_DIA_PAGO  = 20   # y vence el 20 del mes SIGUIENTE al cierre
+# Un consumo sin dinero apartado más de estos días pasa a ser una alerta.
+DIAS_ALERTA_SIN_SEPARAR = 5
+# Un ciclo se identifica por la fecha en que cierra: (año, mes) del día 25.
+# Ej.: el ciclo "2026-03" va del 26-feb al 25-mar y vence el 20-abr.
+
 
 def _add_months(year, month, delta):
     total = (year * 12 + (month - 1)) + delta
@@ -429,30 +440,45 @@ def _add_months(year, month, delta):
 
 
 def ciclo_de_fecha(fecha):
-    """Devuelve (year, month) del mes en que abre el ciclo al que pertenece `fecha`."""
-    if fecha.day > CICLO_DIA_CORTE:
+    """(año, mes) del cierre al que pertenece una compra.
+
+    Las compras hasta el día 25 inclusive entran en el estado de cuenta que
+    cierra ese 25; a partir del 26 ya cuentan para el cierre siguiente.
+    """
+    if fecha.day <= CICLO_DIA_CORTE:
         return fecha.year, fecha.month
-    y, m = _add_months(fecha.year, fecha.month, -1)
-    return y, m
+    return _add_months(fecha.year, fecha.month, 1)
 
 
 def ciclo_bounds(year, month):
-    """Rango real del ciclo: del día siguiente al corte, hasta el corte del mes siguiente.
-
-    El inicio debe coincidir con el umbral de `ciclo_de_fecha` — cuando eran
-    distintos (día 25 vs. día 21), un consumo del 21 al 24 se asignaba a un
-    ciclo cuyo rango mostrado no lo contenía.
-    """
-    inicio = date_type(year, month, CICLO_DIA_CORTE + 1)
-    cy, cm = _add_months(year, month, 1)
-    cierre = date_type(cy, cm, CICLO_DIA_CORTE)
-    dy, dm = _add_months(year, month, 2)
-    vencimiento = date_type(dy, dm, CICLO_DIA_CORTE)
+    """Del ciclo que cierra el 25 de (year, month): (inicio, cierre, vencimiento)."""
+    cierre = date_type(year, month, CICLO_DIA_CORTE)
+    iy, im = _add_months(year, month, -1)
+    inicio = date_type(iy, im, CICLO_DIA_CORTE + 1)
+    vy, vm = _add_months(year, month, 1)
+    vencimiento = date_type(vy, vm, CICLO_DIA_PAGO)
     return inicio, cierre, vencimiento
 
 
 def ciclo_id(year, month):
     return f"{year:04d}-{month:02d}"
+
+
+def ciclo_desde_id(texto):
+    """'2026-03' → (2026, 3). Devuelve None si no es un id de ciclo válido."""
+    try:
+        y, m = texto.split("-")
+        y, m = int(y), int(m)
+        if 1 <= m <= 12 and 2000 <= y <= 2100:
+            return y, m
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
+def ciclo_etiqueta(inicio, cierre):
+    """'26 sep → 25 oct' — el rango exacto que el usuario ve en el filtro."""
+    return f"{inicio.day} {MESES_ES[inicio.month][:3].lower()} → {cierre.day} {MESES_ES[cierre.month][:3].lower()}"
 
 
 # ── page routes ───────────────────────────────────────────────────────
@@ -744,16 +770,20 @@ def crear_tabla():
     # datos, así que la columna nueva se agrega aparte (idempotente). La
     # sintaxis IF NOT EXISTS es de Postgres; en SQLite (desarrollo) la tabla
     # ya nace con la columna, así que un fallo aquí no debe abortar el resto.
-    try:
-        db.session.execute(db.text(
-            "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS pagado_con_tarjeta "
-            "BOOLEAN NOT NULL DEFAULT FALSE"
-        ))
-        db.session.commit()
-        notas.append("Columna pagado_con_tarjeta verificada")
-    except Exception as e:
-        db.session.rollback()
-        notas.append(f"ALTER TABLE omitido ({type(e).__name__})")
+    columnas = [
+        ("pagado_con_tarjeta", "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("dinero_separado",    "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("dinero_separado_el", "DATE"),
+    ]
+    for nombre, tipo in columnas:
+        try:
+            db.session.execute(db.text(
+                f"ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS {nombre} {tipo}"))
+            db.session.commit()
+            notas.append(f"Columna {nombre} verificada")
+        except Exception as e:
+            db.session.rollback()
+            notas.append(f"{nombre} omitida ({type(e).__name__})")
 
     try:
         seed_presupuesto_si_vacio()
@@ -1530,13 +1560,165 @@ def api_tarjeta():
     )
     dinero_disponible_pago = round(fondo_ingresos - sum(p["monto"] for p in pagos), 2)
 
+    # ── Ciclo seleccionado y sus consumos uno por uno ──────────────────
+    cid_sel = ciclo_desde_id(request.args.get("ciclo", "")) or ciclo_actual_cid
+    ini_sel, cie_sel, ven_sel = ciclo_bounds(*cid_sel)
+    consumos = sorted(
+        (m for m in cargos_movs if ini_sel <= m.fecha <= cie_sel),
+        key=lambda m: (m.fecha, m.id), reverse=True,
+    )
+    consumos_json = [{
+        "id": m.id,
+        "fecha": m.fecha.strftime("%Y-%m-%d"),
+        "descripcion": m.descripcion,
+        "categoria": m.categoria,
+        "importe": float(m.importe),
+        "dinero_separado": bool(m.dinero_separado),
+        # Días que lleva un consumo sin que marques que tienes el dinero.
+        "dias_sin_separar": 0 if m.dinero_separado else (hoy - m.fecha).days,
+    } for m in consumos]
+
+    sel_total     = round(sum(c["importe"] for c in consumos_json), 2)
+    sel_separado  = round(sum(c["importe"] for c in consumos_json if c["dinero_separado"]), 2)
+
+    # Lista de ciclos para el selector: los que tienen consumos + el actual.
+    cids_sel = sorted(set(cargos_por_ciclo.keys()) | {ciclo_actual_cid, cid_sel}, reverse=True)
+    ciclos_disponibles = []
+    for cid in cids_sel:
+        i, c, _v = ciclo_bounds(*cid)
+        ciclos_disponibles.append({
+            "id": ciclo_id(*cid),
+            "etiqueta": ciclo_etiqueta(i, c),
+            "total": round(cargos_por_ciclo.get(cid, 0.0), 2),
+            "es_actual": cid == ciclo_actual_cid,
+        })
+
+    # ── Lo que toca pagar: el ciclo cerrado más antiguo que siga con saldo ──
+    cerrados_pendientes = [
+        c for c in ciclos
+        if c["saldo"] > 0.001 and datetime.strptime(c["cierre"], "%Y-%m-%d").date() <= hoy
+    ]
+    tc = _tipo_cambio_actual()
+
+    def _separado_de(cid):
+        i, c_, _v = ciclo_bounds(*cid)
+        return round(sum(float(m.importe) for m in cargos_movs
+                         if i <= m.fecha <= c_ and m.dinero_separado), 2)
+
+    por_pagar = None
+    if cerrados_pendientes:
+        c = min(cerrados_pendientes, key=lambda x: x["vencimiento"])
+        venc = datetime.strptime(c["vencimiento"], "%Y-%m-%d").date()
+        cid_p = ciclo_desde_id(c["id"])
+        ini_p, cie_p, _ = ciclo_bounds(*cid_p)
+        separado_p = _separado_de(cid_p)
+        por_pagar = {
+            "ciclo_id": c["id"],
+            "periodo": ciclo_etiqueta(ini_p, cie_p),
+            "vencimiento": c["vencimiento"],
+            "dias_restantes": (venc - hoy).days,
+            "vencida": venc < hoy,
+            "monto": c["saldo"],
+            "monto_usd": round(c["saldo"] / tc, 2) if tc else None,
+            "tipo_cambio": tc,
+            "separado": min(separado_p, c["saldo"]),
+            "falta": round(max(0.0, c["saldo"] - separado_p), 2),
+            # Si hay más estados de cuenta cerrados sin pagar, no deben quedar
+            # escondidos detrás del más urgente.
+            "otros_pendientes": round(
+                sum(x["saldo"] for x in cerrados_pendientes if x["id"] != c["id"]), 2),
+        }
+
+    # El ciclo en curso aún no vence: va acumulando y se paga el 20 del mes
+    # siguiente a su cierre. Es "lo que se te viene".
+    ini_a, cie_a, ven_a = ciclo_bounds(*ciclo_actual_cid)
+    total_a = round(sum(float(m.importe) for m in cargos_movs if ini_a <= m.fecha <= cie_a), 2)
+    acumulando = {
+        "periodo": ciclo_etiqueta(ini_a, cie_a),
+        "cierra": cie_a.strftime("%Y-%m-%d"),
+        "vencimiento": ven_a.strftime("%Y-%m-%d"),
+        "total": total_a,
+        "total_usd": round(total_a / tc, 2) if tc else None,
+        "separado": _separado_de(ciclo_actual_cid),
+        "dias_para_cierre": (cie_a - hoy).days,
+    }
+
+    # ── Salud: qué parte de lo que debes ya tiene su dinero apartado ──
+    deuda_total = round(sum(c["saldo"] for c in ciclos), 2)
+    separado_total = round(sum(
+        float(m.importe) for m in cargos_movs if m.dinero_separado), 2)
+    cubierto = min(separado_total, deuda_total)
+    pct_cubierto = round(cubierto / deuda_total * 100) if deuda_total > 0.001 else 100
+    if deuda_total <= 0.001:
+        nivel, mensaje = "excelente", "No tienes deuda pendiente con la tarjeta."
+    elif pct_cubierto >= 100:
+        nivel, mensaje = "excelente", "Tienes el dinero de toda tu deuda. Vas al día."
+    elif pct_cubierto >= 70:
+        nivel, mensaje = "buena", f"Te falta apartar S/ {deuda_total - cubierto:,.2f} para cubrir todo."
+    elif pct_cubierto >= 40:
+        nivel, mensaje = "regular", f"Más de la mitad de tu deuda aún no tiene dinero apartado."
+    else:
+        nivel, mensaje = "mala", "Casi toda tu deuda está sin respaldo. Revisa tus consumos."
+
+    # ── Consumos olvidados: en rojo por más de 5 días ──
+    alertas = [{
+        "id": m.id, "fecha": m.fecha.strftime("%Y-%m-%d"),
+        "descripcion": m.descripcion, "importe": float(m.importe),
+        "dias": (hoy - m.fecha).days,
+    } for m in sorted(cargos_movs, key=lambda x: x.fecha)
+        if not m.dinero_separado and (hoy - m.fecha).days > DIAS_ALERTA_SIN_SEPARAR]
+
+    # ── Datos de los gráficos generales (no dependen del filtro de ciclo) ──
+    por_ciclo_graf = []
+    for cid in sorted(set(cargos_por_ciclo.keys()) | {ciclo_actual_cid})[-8:]:
+        i, c, _v = ciclo_bounds(*cid)
+        delciclo = [m for m in cargos_movs if i <= m.fecha <= c]
+        sep = sum(float(m.importe) for m in delciclo if m.dinero_separado)
+        tot = sum(float(m.importe) for m in delciclo)
+        por_ciclo_graf.append({
+            "etiqueta": f"{MESES_ES[c.month][:3]} {c.year}",
+            "separado": round(sep, 2),
+            "sin_separar": round(tot - sep, 2),
+        })
+
+    por_categoria = defaultdict(float)
+    por_comercio = defaultdict(float)
+    for m in cargos_movs:
+        por_categoria[m.categoria] += float(m.importe)
+        por_comercio[m.descripcion] += float(m.importe)
+
     return jsonify({
         "kpis": {
-            "deuda_total": round(sum(c["saldo"] for c in ciclos), 2),
+            "deuda_total": deuda_total,
             "proximo_vencimiento": proximo["vencimiento"] if proximo else None,
             "monto_proximo_vencimiento": proximo["saldo"] if proximo else 0,
             "ciclo_actual_total": ciclo_actual["total_cargos"] if ciclo_actual else 0,
             "dinero_disponible_pago": dinero_disponible_pago,
+        },
+        "ciclo_sel": {
+            "id": ciclo_id(*cid_sel),
+            "etiqueta": ciclo_etiqueta(ini_sel, cie_sel),
+            "inicio": ini_sel.strftime("%Y-%m-%d"),
+            "cierre": cie_sel.strftime("%Y-%m-%d"),
+            "vencimiento": ven_sel.strftime("%Y-%m-%d"),
+            "es_actual": cid_sel == ciclo_actual_cid,
+            "total": sel_total,
+            "separado": sel_separado,
+            "sin_separar": round(sel_total - sel_separado, 2),
+            "consumos": consumos_json,
+        },
+        "ciclos_disponibles": ciclos_disponibles,
+        "por_pagar": por_pagar,
+        "acumulando": acumulando,
+        "salud": {"pct_cubierto": pct_cubierto, "nivel": nivel, "mensaje": mensaje,
+                  "deuda_total": deuda_total, "cubierto": cubierto},
+        "alertas": alertas,
+        "general": {
+            "por_ciclo": por_ciclo_graf,
+            "por_categoria": [{"label": k, "value": round(v, 2)}
+                              for k, v in sorted(por_categoria.items(), key=lambda x: -x[1])],
+            "top_comercios": [{"label": k, "value": round(v, 2)}
+                              for k, v in sorted(por_comercio.items(), key=lambda x: -x[1])[:8]],
         },
         "ciclos": ciclos,
         "pagos": [{
@@ -1547,6 +1729,26 @@ def api_tarjeta():
             "origen": p["origen"],
         } for p in reversed(pagos)],
     })
+
+
+@app.route("/api/tarjeta/consumos/<int:id>/dinero", methods=["POST"])
+@login_requerido
+def api_tarjeta_marcar_dinero(id):
+    """Marca o desmarca que ya tienes apartado el dinero de ese consumo."""
+    m = Movimiento.query.get_or_404(id)
+    es_consumo_tarjeta = m.tipo == "Gasto" and (m.pagado_con_tarjeta or m.categoria == "Tarjeta")
+    if not es_consumo_tarjeta:
+        return jsonify({"error": "Ese movimiento no es un consumo con tarjeta"}), 400
+    datos = request.get_json(force=True, silent=True) or {}
+    separado = bool(datos.get("separado", True))
+    try:
+        m.dinero_separado = separado
+        m.dinero_separado_el = hoy_local() if separado else None
+        db.session.commit()
+        return jsonify({"ok": True, "id": m.id, "dinero_separado": m.dinero_separado})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/tarjeta/pagos/<int:id>", methods=["DELETE"])
@@ -1788,12 +1990,16 @@ def api_presupuesto_item_detail(id):
 
 _tc_cache = {"rate": None, "ts": 0}
 
-@app.route("/api/tipo-cambio")
-@login_requerido
-def api_tipo_cambio():
+
+def _tipo_cambio_actual():
+    """USD→PEN, cacheado una hora. None si ninguna fuente responde.
+
+    Se usa también desde /api/tarjeta para mostrar la deuda en dólares, así
+    que una caída de la API externa no debe tumbar el dashboard.
+    """
     now = time.time()
     if _tc_cache["rate"] and now - _tc_cache["ts"] < 3600:
-        return jsonify({"rate": _tc_cache["rate"]})
+        return _tc_cache["rate"]
     apis = [
         ("https://api.frankfurter.app/latest?from=USD&to=PEN", lambda d: d["rates"]["PEN"]),
         ("https://open.er-api.com/v6/latest/USD",              lambda d: d["rates"]["PEN"]),
@@ -1802,12 +2008,18 @@ def api_tipo_cambio():
         try:
             resp = http_requests.get(url, timeout=5)
             rate = extractor(resp.json())
-            _tc_cache["rate"] = rate
-            _tc_cache["ts"]   = now
-            return jsonify({"rate": rate})
+            _tc_cache["rate"], _tc_cache["ts"] = rate, now
+            return rate
         except Exception:
             continue
-    return jsonify({"error": "no disponible"}), 503
+    return _tc_cache["rate"]   # el último conocido, aunque esté vencido
+
+
+@app.route("/api/tipo-cambio")
+@login_requerido
+def api_tipo_cambio():
+    rate = _tipo_cambio_actual()
+    return jsonify({"rate": rate}) if rate else (jsonify({"error": "no disponible"}), 503)
 
 
 if __name__ == "__main__":

@@ -252,6 +252,37 @@
 
   </form>
 </div>
+
+<!-- Consumos del período en curso: aparece al elegir la categoría "Tarjeta",
+     para marcar ahí mismo de cuáles ya tienes el dinero. -->
+<div id="bloque-consumos" style="display:none; margin-top:26px">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <h2 style="font-size:15px;font-weight:700;color:var(--text)">Consumos de este período con tarjeta</h2>
+    <span style="font-size:12px;color:var(--text-subtle)" id="bc-periodo"></span>
+  </div>
+  <div class="tbl-card">
+    <div class="consumos-resumen">
+      <span class="consumos-chip chip-total">Total <span id="bc-total">S/ 0.00</span></span>
+      <span class="consumos-chip chip-ok">Con dinero <span id="bc-ok">S/ 0.00</span></span>
+      <span class="consumos-chip chip-pend">Sin dinero <span id="bc-pend">S/ 0.00</span></span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Compra</th><th>Categoría</th>
+            <th style="text-align:right">Monto</th>
+            <th style="text-align:center">¿Tengo el dinero?</th>
+          </tr>
+        </thead>
+        <tbody id="bc-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <p style="font-size:12px;color:var(--text-subtle);margin-top:10px">
+    Se paga hasta el <b id="bc-vence"></b>. Lo que aparece en rojo todavía no tiene dinero apartado.
+  </p>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -295,6 +326,33 @@
 
   function updateIngresoLabel() {
     document.getElementById('ingreso-label').textContent = isTarjetaCategoria() ? 'Repago' : 'Ingreso';
+  }
+
+  /* Al elegir "Tarjeta" se trae el período en curso y se puede marcar el
+     dinero sin salir de esta pantalla. */
+  let consumosCargados = false;
+
+  function cargarConsumosTarjeta(forzar) {
+    const bloque = document.getElementById('bloque-consumos');
+    if (!isTarjetaCategoria()) { bloque.style.display = 'none'; return; }
+    bloque.style.display = '';
+    if (consumosCargados && !forzar) return;
+
+    cargarJSON('/api/tarjeta')
+      .then(d => {
+        consumosCargados = true;
+        const cs = d.ciclo_sel;
+        document.getElementById('bc-periodo').textContent = cs.etiqueta;
+        document.getElementById('bc-total').textContent = fmtSoles(cs.total);
+        document.getElementById('bc-ok').textContent    = fmtSoles(cs.separado);
+        document.getElementById('bc-pend').textContent  = fmtSoles(cs.sin_separar);
+        const [a, m, dd] = cs.vencimiento.split('-').map(Number);
+        const meses = ['enero','febrero','marzo','abril','mayo','junio','julio',
+                       'agosto','septiembre','octubre','noviembre','diciembre'];
+        document.getElementById('bc-vence').textContent = `${dd} de ${meses[m - 1]} de ${a}`;
+        pintarConsumosTarjeta('bc-body', cs.consumos, () => cargarConsumosTarjeta(true));
+      })
+      .catch(e => mostrarAviso(`No se pudieron cargar los consumos: ${e.message}`));
   }
 
   function updateFondoTarjetaVisibility() {
@@ -640,6 +698,7 @@
     updateRdTrainingVisibility();
     updateInversionTipoVisibility();
     updateFondoTarjetaVisibility();
+    cargarConsumosTarjeta(false);
 
     const fechaLabel = document.getElementById('fecha-label');
     const importeLabel = document.getElementById('importe-label');

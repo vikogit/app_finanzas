@@ -52,6 +52,23 @@ def sembrar():
             # Tarjeta: consumo, repago y fondo
             M(fecha=dt.date(2026, 8, 5), tipo="Gasto", categoria="Tarjeta", descripcion="Netflix", importe=50),
             M(fecha=dt.date(2026, 8, 22), tipo="Gasto", categoria="Tarjeta", descripcion="Uber", importe=30),
+            # Consumos del ciclo en curso (26-sep → 25-oct), unos con dinero y otros sin él
+            M(fecha=dt.date(2026, 9, 28), tipo="Gasto", categoria="Tarjeta", descripcion="Netflix", importe=44.90),
+            M(fecha=dt.date(2026, 10, 1), tipo="Gasto", categoria="Necesidades", descripcion="Supermercado",
+              importe=312.40, pagado_con_tarjeta=True, dinero_separado=True),
+            M(fecha=dt.date(2026, 10, 3), tipo="Gasto", categoria="Tarjeta", descripcion="Spotify", importe=26.90),
+            M(fecha=dt.date(2026, 10, 7), tipo="Gasto", categoria="Diversión", descripcion="Cine",
+              importe=58.00, pagado_con_tarjeta=True),
+            M(fecha=dt.date(2026, 10, 11), tipo="Gasto", categoria="Necesidades", descripcion="Farmacia",
+              importe=89.50, pagado_con_tarjeta=True, dinero_separado=True),
+            M(fecha=dt.date(2026, 10, 14), tipo="Gasto", categoria="Tarjeta", descripcion="Uber", importe=37.20),
+            M(fecha=dt.date(2026, 10, 16), tipo="Gasto", categoria="Diversión", descripcion="Restaurante",
+              importe=145.00, pagado_con_tarjeta=True),
+            # Ciclo anterior (26-ago → 25-sep): es el que vence el 20-oct
+            M(fecha=dt.date(2026, 9, 2), tipo="Gasto", categoria="Tarjeta", descripcion="Amazon", importe=210.00,
+              dinero_separado=True),
+            M(fecha=dt.date(2026, 9, 12), tipo="Gasto", categoria="Necesidades", descripcion="Supermercado",
+              importe=268.30, pagado_con_tarjeta=True),
             M(fecha=dt.date(2026, 9, 3), tipo="Ingreso", categoria="Tarjeta", descripcion="Pago ciclo", importe=40),
             M(fecha=dt.date(2026, 9, 4), tipo="Fondo", categoria="Tarjeta", descripcion="Aparte sueldo", importe=200),
             M(fecha=dt.date(2026, 8, 10), tipo="Gasto", categoria="Necesidades", descripcion="Farmacia",

@@ -3,79 +3,263 @@
 
 {% block content %}
 <style>
-  .badge-ciclo {
-    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
-    border-radius: 99px; font-size: 11px; font-weight: 600;
+  /* ─── Panel "lo que toca pagar" ─── */
+  .pagar-card {
+    position: relative; overflow: hidden; margin-bottom: 20px;
+    border-radius: 18px; padding: 24px 26px;
+    background: var(--bg-card); border: 1px solid var(--kpi-border);
   }
-  .badge-pagado    { background: rgba(34,197,94,0.12);  color: #4ade80; }
+  .pagar-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; }
+  .pagar-urgente::before { background: linear-gradient(90deg,#ef4444,#f97316); }
+  .pagar-ok::before      { background: linear-gradient(90deg,#22c55e,#4ade80); }
+  .pagar-normal::before  { background: linear-gradient(90deg,#7c3aed,#a78bfa); }
+
+  .pagar-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .pagar-rotulo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--text-muted); }
+  .pagar-monto { font-size: 40px; font-weight: 800; letter-spacing: -1.2px; line-height: 1.05; margin-top: 6px; }
+  .pagar-usd { font-size: 15px; font-weight: 600; color: var(--text-muted); margin-top: 2px; }
+  .pagar-periodo { font-size: 12px; color: var(--text-subtle); margin-top: 8px; }
+
+  .pagar-vence { text-align: right; flex-shrink: 0; }
+  .pagar-fecha { font-size: 21px; font-weight: 800; letter-spacing: -.4px; }
+  .pagar-cuenta {
+    display: inline-block; margin-top: 7px; padding: 5px 13px; border-radius: 99px;
+    font-size: 12px; font-weight: 700;
+  }
+  .cuenta-urgente { background: rgba(239,68,68,0.16); color: #f87171; }
+  .cuenta-ok      { background: rgba(34,197,94,0.14); color: #4ade80; }
+  .cuenta-normal  { background: rgba(124,58,237,0.16); color: #a78bfa; }
+
+  /* Barra: cuánto de esa deuda ya tiene su dinero apartado */
+  .pagar-barra-wrap { margin-top: 20px; }
+  .pagar-barra {
+    height: 13px; border-radius: 99px; overflow: hidden; background: var(--input-bg);
+    border: 1px solid var(--border); display: flex;
+  }
+  .pagar-barra i { display: block; height: 100%; background: linear-gradient(90deg,#22c55e,#4ade80); transition: width .5s ease; }
+  .pagar-leyenda { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12px; flex-wrap: wrap; }
+
+  .pagar-otros {
+    margin-top: 14px; padding: 9px 13px; border-radius: 10px; font-size: 12.5px;
+    background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.28); color: #fca5a5;
+  }
+  /* Lo que todavía no vence: se separa con una línea para no confundirlo
+     con lo que hay que pagar ya. */
+  .pagar-acumula {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
+    flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border);
+  }
+  .pagar-acumula-monto { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -.4px; margin-top: 4px; }
+  .pagar-acumula-usd { font-size: 12px; color: var(--text-subtle); margin-top: 1px; }
+  .pagar-acumula-der { text-align: right; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+  @media (max-width: 600px) { .pagar-acumula-der { text-align: left; } }
+
+  /* ─── Salud ─── */
+  .salud-card { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .salud-aro { position: relative; width: 112px; height: 112px; flex-shrink: 0; }
+  .salud-pct {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; line-height: 1.1;
+  }
+  .salud-pct b { font-size: 24px; font-weight: 800; }
+  .salud-pct span { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+  .salud-texto { flex: 1; min-width: 220px; }
+  .salud-nivel { font-size: 17px; font-weight: 800; letter-spacing: -.3px; }
+  .salud-msg { font-size: 13px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
+
+  /* ─── Alertas de consumos olvidados ─── */
+  .alertas-card {
+    margin-bottom: 20px; padding: 16px 18px; border-radius: 14px;
+    background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
+  }
+  .alertas-titulo { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #fca5a5; }
+  .alertas-lista { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .alerta-item { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--text-muted); }
+  .alerta-item b { color: #fca5a5; }
+
+  /* ─── Selector de ciclo ─── */
+  .ciclo-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--filter-bg); border: 1px solid var(--border);
+    border-radius: 14px; padding: 11px 16px; margin-bottom: 18px;
+  }
+  .ciclo-nav {
+    width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--input-bg); color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;
+  }
+  .ciclo-nav:hover:not(:disabled) { color: var(--text); background: var(--bg-card2); }
+  .ciclo-nav:disabled { opacity: .35; cursor: default; }
+  .ciclo-actual-txt { font-size: 14px; font-weight: 700; color: var(--text); min-width: 150px; text-align: center; }
+  .ciclo-meta { font-size: 11.5px; color: var(--text-subtle); }
+  .ciclo-hoy {
+    margin-left: auto; padding: 4px 11px; border-radius: 99px; font-size: 11px;
+    font-weight: 700; background: rgba(124,58,237,0.16); color: #a78bfa;
+  }
+
+  .badge-ciclo { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-pagado { background: rgba(34,197,94,0.12); color: #4ade80; }
   .badge-pendiente { background: rgba(124,58,237,0.14); color: #a78bfa; }
-  .badge-vencido   { background: rgba(239,68,68,0.14);  color: #f87171; }
-  .badge-vacio     { background: var(--bg-card2);       color: var(--text-subtle); }
-  .venc-hoy { color: #f87171; font-weight: 700; }
+  .badge-vencido { background: rgba(239,68,68,0.14); color: #f87171; }
+  .badge-vacio { background: var(--bg-card2); color: var(--text-subtle); }
+
+  @media (max-width: 600px) {
+    .pagar-monto { font-size: 31px; }
+    .pagar-vence { text-align: left; }
+    .ciclo-hoy { margin-left: 0; }
+  }
 </style>
 
 <div class="page-hdr">
   <h1 class="page-title">Tarjeta de crédito</h1>
+  <p class="page-sub">Corte el 25 de cada mes · pago hasta el 20 del mes siguiente</p>
 </div>
 
-<div class="kpi-grid kpi-grid-4">
-  <div class="card card-p">
-    <div class="kpi-icon" style="background:rgba(124,58,237,0.15)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 6h16.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-9a1.5 1.5 0 011.5-1.5z"/></svg>
+<!-- 1. Lo más importante: cuánto debes y hasta cuándo -->
+<div class="pagar-card pagar-normal" id="pagar-card">
+  <div class="pagar-top">
+    <div>
+      <div class="pagar-rotulo">Tienes una deuda de</div>
+      <div class="pagar-monto" id="pagar-monto">S/ —</div>
+      <div class="pagar-usd" id="pagar-usd"></div>
+      <div class="pagar-periodo" id="pagar-periodo"></div>
     </div>
-    <div class="kpi-label">Deuda total</div>
+    <div class="pagar-vence">
+      <div class="pagar-rotulo">Para pagarla hasta</div>
+      <div class="pagar-fecha" id="pagar-fecha">—</div>
+      <div class="pagar-cuenta cuenta-normal" id="pagar-cuenta">—</div>
+    </div>
+  </div>
+  <div class="pagar-barra-wrap" id="pagar-barra-wrap">
+    <div class="pagar-barra"><i id="pagar-barra" style="width:0%"></i></div>
+    <div class="pagar-leyenda">
+      <span style="color:#4ade80">Ya tengo <b id="pagar-tengo">S/ 0.00</b></span>
+      <span style="color:#f87171">Me falta <b id="pagar-falta">S/ 0.00</b></span>
+    </div>
+  </div>
+  <div class="pagar-otros" id="pagar-otros" style="display:none"></div>
+
+  <!-- Lo que se está acumulando en el ciclo abierto y aún no vence -->
+  <div class="pagar-acumula" id="pagar-acumula">
+    <div class="pagar-acumula-izq">
+      <div class="pagar-rotulo">Y vas acumulando</div>
+      <div class="pagar-acumula-monto" id="acum-monto">S/ —</div>
+      <div class="pagar-acumula-usd" id="acum-usd"></div>
+    </div>
+    <div class="pagar-acumula-der">
+      <div id="acum-periodo"></div>
+      <div id="acum-vence"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Consumos olvidados -->
+<div class="alertas-card" id="alertas-card" style="display:none">
+  <div class="alertas-titulo">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+    </svg>
+    <span id="alertas-titulo-txt"></span>
+  </div>
+  <div class="alertas-lista" id="alertas-lista"></div>
+</div>
+
+<!-- 3. Salud + KPIs -->
+<div class="charts-grid-main" style="margin-bottom:20px">
+  <div class="card card-p salud-card">
+    <div class="salud-aro"><canvas id="chartSalud"></canvas>
+      <div class="salud-pct"><b id="salud-pct">—</b><span>respaldado</span></div>
+    </div>
+    <div class="salud-texto">
+      <div class="salud-nivel" id="salud-nivel">—</div>
+      <div class="salud-msg" id="salud-msg"></div>
+    </div>
+  </div>
+  <div class="card card-p">
+    <div class="kpi-label">Deuda total pendiente</div>
     <div class="kpi-value" style="color:#a78bfa" id="kpi-deuda">S/ —</div>
-  </div>
-  <div class="card card-p">
-    <div class="kpi-icon" style="background:rgba(248,113,113,0.15)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-8.25 3h.008v.008h-.008V15z"/></svg>
+    <div class="kpi-delta" style="margin-top:14px">
+      <span class="kpi-label">Dinero apartado para la tarjeta</span>
+      <div class="kpi-value" style="font-size:20px" id="kpi-fondo-pago">S/ —</div>
     </div>
-    <div class="kpi-label">Próximo vencimiento</div>
-    <div class="kpi-value" style="color:#f87171;font-size:18px" id="kpi-vencimiento">—</div>
-    <div class="kpi-delta" id="kpi-vencimiento-monto"></div>
-  </div>
-  <div class="card card-p">
-    <div class="kpi-icon" style="background:rgba(167,139,250,0.12)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
-    </div>
-    <div class="kpi-label">Consumido en el ciclo actual</div>
-    <div class="kpi-value" style="color:#c4b5fd" id="kpi-ciclo-actual">S/ —</div>
-  </div>
-  <div class="card card-p">
-    <div class="kpi-icon" style="background:rgba(74,222,128,0.15)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182.552-.44 1.278-.659 2.003-.659.725 0 1.45.22 2.003.659l.415.33"/></svg>
-    </div>
-    <div class="kpi-label">Dinero para pagar la tarjeta</div>
-    <div class="kpi-value" id="kpi-fondo-pago">S/ —</div>
   </div>
 </div>
 
-<div class="card card-p" style="margin-bottom:22px">
+<!-- 4. Filtro de ciclo + consumos -->
+<h2 style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Consumos del período</h2>
+
+<div class="ciclo-bar">
+  <button type="button" class="ciclo-nav" id="ciclo-prev" aria-label="Período anterior">‹</button>
+  <div>
+    <div class="ciclo-actual-txt" id="ciclo-txt">—</div>
+    <div class="ciclo-meta" id="ciclo-meta"></div>
+  </div>
+  <button type="button" class="ciclo-nav" id="ciclo-next" aria-label="Período siguiente">›</button>
+  <span class="ciclo-hoy" id="ciclo-hoy" style="display:none">Período en curso</span>
+</div>
+
+<div class="tbl-card" style="margin-bottom:28px">
+  <div class="consumos-resumen">
+    <span class="consumos-chip chip-total">Total <span id="res-total">S/ 0.00</span></span>
+    <span class="consumos-chip chip-ok">Con dinero <span id="res-ok">S/ 0.00</span></span>
+    <span class="consumos-chip chip-pend">Sin dinero <span id="res-pend">S/ 0.00</span></span>
+  </div>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Compra</th>
+          <th>Categoría</th>
+          <th style="text-align:right">Monto</th>
+          <th style="text-align:center">¿Tengo el dinero?</th>
+        </tr>
+      </thead>
+      <tbody id="consumos-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 5. Gráficos generales -->
+<h2 style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Panorama general</h2>
+
+<div class="charts-grid-main" style="margin-bottom:20px">
+  <div class="card card-p">
+    <div class="chart-title">
+      Cuánto de cada período tiene su dinero
+      <span class="chart-badge badge-purple">Barras</span>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Con dinero apartado</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Sin dinero apartado</div>
+    </div>
+    <div class="chart-area-wrap"><canvas id="chartPorCiclo"></canvas></div>
+  </div>
+  <div class="card card-p">
+    <div class="chart-title">
+      ¿En qué usas la tarjeta?
+      <span class="chart-badge badge-purple">Pastel</span>
+    </div>
+    <div class="chart-donut-wrap" style="position:relative"><canvas id="chartCategorias"></canvas></div>
+  </div>
+</div>
+
+<div class="card card-p" style="margin-bottom:28px">
   <div class="chart-title">
-    Consumido vs. pagado por ciclo
+    Tus mayores consumos con tarjeta
     <span class="chart-badge badge-purple">Barras</span>
   </div>
-  <div class="chart-legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Consumido</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>Pagado</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Saldo pendiente</div>
-  </div>
-  <div style="position:relative;height:230px">
-    <canvas id="chartCiclos"></canvas>
-  </div>
+  <div style="position:relative;height:230px"><canvas id="chartComercios"></canvas></div>
 </div>
 
-<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
-  <h2 style="font-size:15px;font-weight:700;color:var(--text)">Ciclos de facturación</h2>
-  <a href="/nuevo" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">+ Registrar consumo o pago →</a>
-</div>
-
+<!-- 6. Historial de ciclos y pagos -->
+<h2 style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Historial de ciclos</h2>
 <div class="tbl-card" style="margin-bottom:28px">
   <div class="tbl-wrap">
     <table class="tbl">
       <thead>
         <tr>
-          <th>Ciclo</th>
+          <th>Período</th>
           <th style="text-align:right">Consumido</th>
           <th style="text-align:right">Pagado</th>
           <th style="text-align:right">Saldo</th>
@@ -85,29 +269,17 @@
       </thead>
       <tbody id="ciclos-body"></tbody>
     </table>
-    <div class="empty-state" id="ciclos-empty" style="display:none">
-      <p style="font-size:13px;margin-bottom:8px">Aún no tienes consumos de tarjeta registrados.</p>
-      <a href="/nuevo" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">Registrar el primero →</a>
-    </div>
   </div>
 </div>
 
 <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
   <h2 style="font-size:15px;font-weight:700;color:var(--text)">Pagos registrados</h2>
-  <a href="/movimientos?categoria=Tarjeta" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">Ver todos los movimientos de Tarjeta →</a>
+  <a href="/movimientos?categoria=Tarjeta" style="font-size:12px;font-weight:600;color:#a78bfa;text-decoration:none">Ver todos los movimientos →</a>
 </div>
-
 <div class="tbl-card">
   <div class="tbl-wrap">
     <table class="tbl">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th style="text-align:right">Monto</th>
-          <th>Nota</th>
-          <th></th>
-        </tr>
-      </thead>
+      <thead><tr><th>Fecha</th><th style="text-align:right">Monto</th><th>Nota</th><th></th></tr></thead>
       <tbody id="pagos-body"></tbody>
     </table>
     <div class="empty-state" id="pagos-empty" style="display:none">
@@ -120,44 +292,159 @@
 
 {% block scripts %}
 <script>
-
-function fmtFecha(iso) {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
+let chartSalud = null, chartPorCiclo = null, chartCategorias = null, chartComercios = null;
+let cicloActualId = null, ciclosDisponibles = [];
 
 const ESTADO_LABEL = { pagado: 'Pagado', pendiente: 'Pendiente', vencido: 'Vencido', vacio: 'Sin consumos' };
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
-let chartCiclos = null;
+function fmtFecha(iso) { const [a,m,d] = iso.split('-'); return `${d}/${m}/${a}`; }
+function fmtFechaLarga(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  return `${d} de ${MESES[m - 1]} de ${a}`;
+}
 
-// Consumido, pagado y saldo por ciclo — de más antiguo a más reciente, que
-// es como se lee una línea de tiempo.
-function renderCiclos(ciclos) {
-  // Los ciclos sin movimiento ocupan una ranura vacía en el eje; en la tabla
-  // sí se listan, pero en el gráfico solo estorban.
-  const datos = [...ciclos].reverse()
-    .filter(c => c.total_cargos > 0 || c.total_pagado > 0);
-  const ctx = document.getElementById('chartCiclos').getContext('2d');
+/* ── Panel de "lo que toca pagar" ─────────────────────────────────── */
+function pintarPorPagar(pp) {
+  const card = document.getElementById('pagar-card');
+  const barraWrap = document.getElementById('pagar-barra-wrap');
+
+  if (!pp) {
+    card.className = 'pagar-card pagar-ok';
+    document.getElementById('pagar-monto').textContent = 'S/ 0.00';
+    document.getElementById('pagar-monto').style.color = '#4ade80';
+    document.getElementById('pagar-usd').textContent = '';
+    document.getElementById('pagar-periodo').textContent = 'No tienes ningún estado de cuenta pendiente de pago.';
+    document.getElementById('pagar-fecha').textContent = '—';
+    const cu = document.getElementById('pagar-cuenta');
+    cu.textContent = 'Todo al día';
+    cu.className = 'pagar-cuenta cuenta-ok';
+    barraWrap.style.display = 'none';
+    return;
+  }
+  barraWrap.style.display = '';
+
+  // Urgente si vence en 5 días o menos, o si ya venció.
+  const urgente = pp.vencida || pp.dias_restantes <= 5;
+  const cubierto = pp.falta <= 0.009;
+  card.className = 'pagar-card ' + (cubierto ? 'pagar-ok' : urgente ? 'pagar-urgente' : 'pagar-normal');
+
+  const monto = document.getElementById('pagar-monto');
+  monto.textContent = fmtSoles(pp.monto);
+  monto.style.color = cubierto ? '#4ade80' : urgente ? '#f87171' : '#a78bfa';
+
+  document.getElementById('pagar-usd').textContent =
+    pp.monto_usd != null ? `≈ $ ${pp.monto_usd.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2})} (TC ${pp.tipo_cambio.toFixed(3)})` : '';
+  document.getElementById('pagar-periodo').textContent = `Consumos del período ${pp.periodo}`;
+  document.getElementById('pagar-fecha').textContent = fmtFechaLarga(pp.vencimiento);
+
+  const cu = document.getElementById('pagar-cuenta');
+  if (pp.vencida)             { cu.textContent = `Venció hace ${Math.abs(pp.dias_restantes)} día(s)`; cu.className = 'pagar-cuenta cuenta-urgente'; }
+  else if (pp.dias_restantes === 0) { cu.textContent = 'Vence HOY';            cu.className = 'pagar-cuenta cuenta-urgente'; }
+  else if (urgente)           { cu.textContent = `Faltan ${pp.dias_restantes} día(s)`; cu.className = 'pagar-cuenta cuenta-urgente'; }
+  else                        { cu.textContent = `Faltan ${pp.dias_restantes} días`;   cu.className = 'pagar-cuenta cuenta-normal'; }
+
+  const pct = pp.monto > 0 ? Math.min(100, pp.separado / pp.monto * 100) : 100;
+  document.getElementById('pagar-barra').style.width = pct + '%';
+  document.getElementById('pagar-tengo').textContent = fmtSoles(pp.separado);
+  document.getElementById('pagar-falta').textContent = fmtSoles(pp.falta);
+
+  const otros = document.getElementById('pagar-otros');
+  if (pp.otros_pendientes > 0.009) {
+    otros.style.display = '';
+    otros.textContent = `Además tienes ${fmtSoles(pp.otros_pendientes)} de otros estados de cuenta cerrados sin pagar.`;
+  } else {
+    otros.style.display = 'none';
+  }
+}
+
+/* Lo que se acumula en el ciclo abierto: todavía no vence, pero conviene
+   verlo venir. */
+function pintarAcumulando(ac) {
+  document.getElementById('acum-monto').textContent = fmtSoles(ac.total);
+  document.getElementById('acum-usd').textContent =
+    ac.total_usd != null ? `≈ $ ${ac.total_usd.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '';
+  document.getElementById('acum-periodo').textContent = `Período ${ac.periodo}`;
+  const cierra = ac.dias_para_cierre >= 0
+    ? `Cierra en ${ac.dias_para_cierre} día(s)` : 'Período cerrado';
+  document.getElementById('acum-vence').textContent =
+    `${cierra} · se paga hasta el ${fmtFechaLarga(ac.vencimiento)}`;
+}
+
+/* ── Salud financiera de la tarjeta ───────────────────────────────── */
+const COLOR_NIVEL = { excelente: '#4ade80', buena: '#a3e635', regular: '#fbbf24', mala: '#f87171' };
+
+function pintarSalud(s) {
+  const color = COLOR_NIVEL[s.nivel] || '#a78bfa';
+  document.getElementById('salud-pct').textContent = s.pct_cubierto + '%';
+  document.getElementById('salud-pct').style.color = color;
+  const nivel = document.getElementById('salud-nivel');
+  nivel.textContent = { excelente: 'Salud excelente', buena: 'Salud buena',
+                        regular: 'Salud regular', mala: 'Salud mala' }[s.nivel];
+  nivel.style.color = color;
+  document.getElementById('salud-msg').textContent = s.mensaje;
+
+  if (chartSalud) { chartSalud.destroy(); window._charts = window._charts.filter(c => c !== chartSalud); }
+  const dark = document.documentElement.classList.contains('dark');
+  chartSalud = new Chart(document.getElementById('chartSalud').getContext('2d'), {
+    type: 'doughnut',
+    data: { datasets: [{
+      data: [s.pct_cubierto, Math.max(0, 100 - s.pct_cubierto)],
+      backgroundColor: [color, dark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)'],
+      borderWidth: 0, circumference: 360,
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '76%',
+      animation: { duration: 700 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    }
+  });
+  window._charts.push(chartSalud);
+}
+
+/* ── Consumos olvidados ───────────────────────────────────────────── */
+function pintarAlertas(alertas) {
+  const card = document.getElementById('alertas-card');
+  if (!alertas.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  document.getElementById('alertas-titulo-txt').textContent =
+    `${alertas.length} consumo(s) llevan más de 5 días sin que registres el dinero`;
+  const lista = document.getElementById('alertas-lista');
+  lista.innerHTML = '';
+  for (const a of alertas.slice(0, 6)) {
+    const fila = document.createElement('div');
+    fila.className = 'alerta-item';
+    const izq = document.createElement('span');
+    izq.textContent = `${fmtFecha(a.fecha)} · ${a.descripcion}`;
+    const der = document.createElement('b');
+    der.textContent = `${fmtSoles(a.importe)} · ${a.dias} días`;
+    fila.append(izq, der);
+    lista.appendChild(fila);
+  }
+}
+
+/* ── Gráficos generales ───────────────────────────────────────────── */
+function pintarGenerales(g) {
   const dark = document.documentElement.classList.contains('dark');
   const gridC = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   const tickC = dark ? 'rgba(255,255,255,0.4)' : '#64748b';
+  const tooltipBase = {
+    backgroundColor: dark ? 'rgba(6,6,16,0.95)' : 'rgba(15,23,42,0.94)',
+    titleColor: '#f1f5f9', bodyColor: '#f1f5f9',
+    borderColor: 'rgba(124,58,237,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
+  };
 
-  if (chartCiclos) {
-    chartCiclos.destroy();
-    window._charts = window._charts.filter(c => c !== chartCiclos);
-  }
-
-  chartCiclos = new Chart(ctx, {
+  // Apiladas: de un vistazo se ve qué parte de cada período está respaldada.
+  if (chartPorCiclo) { chartPorCiclo.destroy(); window._charts = window._charts.filter(c => c !== chartPorCiclo); }
+  chartPorCiclo = new Chart(document.getElementById('chartPorCiclo').getContext('2d'), {
     type: 'bar',
     data: {
-      labels: datos.map(c => fmtFecha(c.cierre).slice(0, 5)),
+      labels: g.por_ciclo.map(c => c.etiqueta),
       datasets: [
-        { label: 'Consumido', data: datos.map(c => c.total_cargos),
-          backgroundColor: 'rgba(167,139,250,0.75)', borderRadius: 5, maxBarThickness: 38 },
-        { label: 'Pagado', data: datos.map(c => c.total_pagado),
-          backgroundColor: 'rgba(74,222,128,0.75)', borderRadius: 5, maxBarThickness: 38 },
-        { label: 'Saldo', data: datos.map(c => c.saldo),
-          backgroundColor: 'rgba(248,113,113,0.75)', borderRadius: 5, maxBarThickness: 38 },
+        { label: 'Con dinero', data: g.por_ciclo.map(c => c.separado),
+          backgroundColor: 'rgba(34,197,94,0.85)', borderRadius: 5, maxBarThickness: 46, stack: 'x' },
+        { label: 'Sin dinero', data: g.por_ciclo.map(c => c.sin_separar),
+          backgroundColor: 'rgba(248,113,113,0.85)', borderRadius: 5, maxBarThickness: 46, stack: 'x' },
       ]
     },
     options: {
@@ -165,97 +452,141 @@ function renderCiclos(ciclos) {
       interaction: { mode: 'index', intersect: false },
       animation: { duration: 700, easing: 'easeOutQuart' },
       scales: {
-        x: { grid: { display: false }, ticks: { color: tickC, maxRotation: 0, font: { size: 10 } } },
-        y: { beginAtZero: true, grid: { color: gridC },
+        x: { stacked: true, grid: { display: false }, ticks: { color: tickC, font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, grid: { color: gridC },
              ticks: { color: tickC, font: { size: 10 }, callback: v => 'S/ ' + v.toLocaleString('es-PE') } },
       },
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: dark ? 'rgba(6,6,16,0.95)' : 'rgba(15,23,42,0.94)',
-          titleColor: '#f1f5f9', bodyColor: '#f1f5f9',
-          borderColor: 'rgba(124,58,237,0.35)', borderWidth: 1, padding: 12, cornerRadius: 10,
-          usePointStyle: true,
-          callbacks: {
-            title: items => 'Ciclo que cierra el ' + fmtFecha(datos[items[0].dataIndex].cierre),
-            label: c => ` ${c.dataset.label}: ${fmtMoney(c.parsed.y ?? 0)}`,
-          }
-        }
+        tooltip: { ...tooltipBase, callbacks: { label: c => ` ${c.dataset.label}: ${fmtSoles(c.parsed.y ?? 0)}` } },
       }
     }
   });
-  window._charts.push(chartCiclos);
+  window._charts.push(chartPorCiclo);
+
+  if (chartCategorias) { chartCategorias.destroy(); window._charts = window._charts.filter(c => c !== chartCategorias); }
+  const totalCat = g.por_categoria.reduce((s, x) => s + x.value, 0);
+  chartCategorias = renderDonutChart('chartCategorias', g.por_categoria,
+    `<div class="donut-center-val" style="color:#a78bfa">${fmtSoles(totalCat)}</div>
+     <div class="donut-center-lbl">Total</div>`);
+  window._charts.push(chartCategorias);
+
+  if (chartComercios) { chartComercios.destroy(); window._charts = window._charts.filter(c => c !== chartComercios); }
+  chartComercios = new Chart(document.getElementById('chartComercios').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: g.top_comercios.map(c => c.label),
+      datasets: [{ data: g.top_comercios.map(c => c.value),
+                   backgroundColor: 'rgba(167,139,250,0.8)', borderRadius: 5, maxBarThickness: 26 }]
+    },
+    options: {
+      indexAxis: 'y',            // horizontal: los nombres se leen completos
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      scales: {
+        x: { beginAtZero: true, grid: { color: gridC },
+             ticks: { color: tickC, font: { size: 10 }, callback: v => 'S/ ' + v.toLocaleString('es-PE') } },
+        y: { grid: { display: false }, ticks: { color: tickC, font: { size: 11 } } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipBase, callbacks: { label: c => ' ' + fmtSoles(c.parsed.x ?? 0) } },
+      }
+    }
+  });
+  window._charts.push(chartComercios);
 }
 
-function loadTarjeta() {
-  fetch('/api/tarjeta')
-    .then(r => r.json())
+/* ── Ciclo seleccionado ───────────────────────────────────────────── */
+function pintarCiclo(cs) {
+  document.getElementById('ciclo-txt').textContent = cs.etiqueta;
+  document.getElementById('ciclo-meta').textContent =
+    `Se paga hasta el ${fmtFechaLarga(cs.vencimiento)}`;
+  document.getElementById('ciclo-hoy').style.display = cs.es_actual ? '' : 'none';
+
+  document.getElementById('res-total').textContent = fmtSoles(cs.total);
+  document.getElementById('res-ok').textContent    = fmtSoles(cs.separado);
+  document.getElementById('res-pend').textContent  = fmtSoles(cs.sin_separar);
+
+  pintarConsumosTarjeta('consumos-body', cs.consumos, () => cargar(cicloActualId));
+
+  const i = ciclosDisponibles.findIndex(c => c.id === cs.id);
+  // La lista llega de más reciente a más antiguo.
+  document.getElementById('ciclo-next').disabled = i <= 0;
+  document.getElementById('ciclo-prev').disabled = i < 0 || i >= ciclosDisponibles.length - 1;
+}
+
+function moverCiclo(paso) {
+  const i = ciclosDisponibles.findIndex(c => c.id === cicloActualId);
+  const j = i + paso;
+  if (j < 0 || j >= ciclosDisponibles.length) return;
+  cargar(ciclosDisponibles[j].id);
+}
+
+/* ── Carga ────────────────────────────────────────────────────────── */
+function cargar(cicloId) {
+  const url = cicloId ? `/api/tarjeta?ciclo=${cicloId}` : '/api/tarjeta';
+  cargarJSON(url)
     .then(data => {
-      document.getElementById('kpi-deuda').textContent = fmtMoney(data.kpis.deuda_total);
+      ciclosDisponibles = data.ciclos_disponibles;
+      cicloActualId = data.ciclo_sel.id;
 
-      const kv = document.getElementById('kpi-vencimiento');
-      const kvm = document.getElementById('kpi-vencimiento-monto');
-      if (data.kpis.proximo_vencimiento) {
-        kv.textContent = fmtFecha(data.kpis.proximo_vencimiento);
-        kvm.textContent = fmtMoney(data.kpis.monto_proximo_vencimiento);
-      } else {
-        kv.textContent = 'Sin pendientes';
-        kvm.textContent = '';
-      }
+      pintarPorPagar(data.por_pagar);
+      pintarAcumulando(data.acumulando);
+      pintarSalud(data.salud);
+      pintarAlertas(data.alertas);
+      pintarCiclo(data.ciclo_sel);
+      pintarGenerales(data.general);
 
-      document.getElementById('kpi-ciclo-actual').textContent = fmtMoney(data.kpis.ciclo_actual_total);
+      document.getElementById('kpi-deuda').textContent = fmtSoles(data.kpis.deuda_total);
+      const kf = document.getElementById('kpi-fondo-pago');
+      kf.textContent = fmtSoles(data.kpis.dinero_disponible_pago);
+      kf.style.color = data.kpis.dinero_disponible_pago >= 0 ? '#4ade80' : '#f87171';
 
-      const kpiFondoPago = document.getElementById('kpi-fondo-pago');
-      kpiFondoPago.textContent = fmtMoney(data.kpis.dinero_disponible_pago);
-      kpiFondoPago.style.color = data.kpis.dinero_disponible_pago >= 0 ? '#4ade80' : '#f87171';
+      pintarCiclos(data.ciclos);
+      pintarPagos(data.pagos);
+    })
+    .catch(e => mostrarErrorCarga(`No se pudieron cargar los datos de la tarjeta: ${e.message}`));
+}
 
-      renderCiclos(data.ciclos);
+function pintarCiclos(ciclos) {
+  const body = document.getElementById('ciclos-body');
+  body.innerHTML = '';
+  for (const c of ciclos) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${fmtFecha(c.inicio)} → ${fmtFecha(c.cierre)}</td>
+      <td class="right">${fmtSoles(c.total_cargos)}</td>
+      <td class="right" style="color:#4ade80">${fmtSoles(c.total_pagado)}</td>
+      <td class="right" style="font-weight:700;${c.saldo > 0 ? 'color:#a78bfa' : ''}">${fmtSoles(c.saldo)}</td>
+      <td class="muted">${fmtFecha(c.vencimiento)}</td>
+      <td><span class="badge-ciclo badge-${c.estado}">${ESTADO_LABEL[c.estado]}</span></td>`;
+    body.appendChild(tr);
+  }
+}
 
-      const ciclosBody = document.getElementById('ciclos-body');
-      const ciclosEmpty = document.getElementById('ciclos-empty');
-      ciclosBody.innerHTML = '';
-      if (!data.ciclos.length) {
-        ciclosEmpty.style.display = 'block';
-      } else {
-        ciclosEmpty.style.display = 'none';
-        data.ciclos.forEach(c => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="muted">${fmtFecha(c.inicio)} → ${fmtFecha(c.cierre)}</td>
-            <td class="right">${fmtMoney(c.total_cargos)}</td>
-            <td class="right" style="color:#4ade80">${fmtMoney(c.total_pagado)}</td>
-            <td class="right" style="font-weight:700;${c.saldo > 0 ? 'color:#a78bfa' : ''}">${fmtMoney(c.saldo)}</td>
-            <td class="muted">${fmtFecha(c.vencimiento)}</td>
-            <td><span class="badge-ciclo badge-${c.estado}">${ESTADO_LABEL[c.estado]}</span></td>`;
-          ciclosBody.appendChild(tr);
-        });
-      }
-
-      const pagosBody = document.getElementById('pagos-body');
-      const pagosEmpty = document.getElementById('pagos-empty');
-      pagosBody.innerHTML = '';
-      if (!data.pagos.length) {
-        pagosEmpty.style.display = 'block';
-      } else {
-        pagosEmpty.style.display = 'none';
-        data.pagos.forEach(p => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="muted">${fmtFecha(p.fecha)}</td>
-            <td class="right" style="font-weight:700;color:#4ade80">${fmtMoney(p.monto)}</td>
-            <td class="muted">${p.nota || '—'}</td>
-            <td class="right">
-              <a href="#" onclick="eliminarPago(${p.id},'${p.origen}');return false" class="btn-del">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
-                </svg>
-                Eliminar
-              </a>
-            </td>`;
-          pagosBody.appendChild(tr);
-        });
-      }
-    });
+function pintarPagos(pagos) {
+  const body = document.getElementById('pagos-body');
+  const vacio = document.getElementById('pagos-empty');
+  body.innerHTML = '';
+  if (!pagos.length) { vacio.style.display = 'block'; return; }
+  vacio.style.display = 'none';
+  for (const p of pagos) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="muted">${fmtFecha(p.fecha)}</td>
+      <td class="right" style="font-weight:700;color:#4ade80">${fmtSoles(p.monto)}</td>
+      <td class="muted nota"></td>
+      <td class="right">
+        <button class="btn-del" onclick="eliminarPago(${p.id},'${p.origen}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9M4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M6.31 5.393c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m3.09 0a48.667 48.667 0 013.478.397"/>
+          </svg>Eliminar
+        </button>
+      </td>`;
+    tr.querySelector('.nota').textContent = p.nota || '—';
+    body.appendChild(tr);
+  }
 }
 
 function eliminarPago(id, origen) {
@@ -265,10 +596,12 @@ function eliminarPago(id, origen) {
     : fetch(`/api/tarjeta/pagos/${id}`, { method: 'DELETE' });
   req.then(r => {
     if (!r.ok) throw new Error('No se pudo eliminar el pago');
-    loadTarjeta();
+    cargar(cicloActualId);
   }).catch(e => mostrarAviso(e.message));
 }
 
-window.addEventListener('DOMContentLoaded', loadTarjeta);
+document.getElementById('ciclo-prev').addEventListener('click', () => moverCiclo(1));
+document.getElementById('ciclo-next').addEventListener('click', () => moverCiclo(-1));
+window.addEventListener('DOMContentLoaded', () => cargar(null));
 </script>
 {% endblock %}

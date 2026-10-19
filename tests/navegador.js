@@ -125,6 +125,52 @@ async function entrar(page) {
           `quedaron ${await page.locator('#metas-body tr').count()}, esperaba ${mAntes}`);
   }
 
+  console.log('\n=== 4b. Tarjeta: marcar "ya tengo el dinero" ===');
+  actual = 'tarjeta-consumos';
+  await page.goto(`${BASE}/dashboard/tarjeta`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1600);
+  const rojosIni = await page.locator('.consumo-pend').count();
+  check('hay consumos sin dinero apartado (en rojo)', rojosIni > 0, 'no hay con qué probar');
+
+  // El check no debe cambiar nada hasta confirmar.
+  await page.locator('.consumo-pend .consumo-check').first().click();
+  await page.waitForTimeout(450);
+  check('el check pide confirmación', (await page.locator('#modal-consumo.open').count()) > 0);
+  const detalle = await page.locator('.mc-detalle').innerText();
+  check('la confirmación muestra la compra', /Fecha[\s\S]*Compra[\s\S]*Monto/.test(detalle), detalle.slice(0, 60));
+  await page.click('#mc-cancelar');
+  await page.waitForTimeout(400);
+  check('cancelar no cambia nada', (await page.locator('.consumo-pend').count()) === rojosIni);
+
+  await page.locator('.consumo-pend .consumo-check').first().click();
+  await page.waitForTimeout(400);
+  await page.click('#mc-confirmar');
+  await page.waitForTimeout(1600);
+  check('confirmar pasa el consumo de rojo a verde',
+        (await page.locator('.consumo-pend').count()) === rojosIni - 1,
+        `quedaron ${await page.locator('.consumo-pend').count()}, esperaba ${rojosIni - 1}`);
+
+  const per1 = await page.locator('#ciclo-txt').innerText();
+  await page.click('#ciclo-prev');
+  await page.waitForTimeout(1500);
+  check('el filtro cambia de período', (await page.locator('#ciclo-txt').innerText()) !== per1, per1);
+
+  check('el panel muestra la deuda en soles y dólares',
+        /S\//.test(await page.locator('#pagar-monto').innerText()) &&
+        /\$/.test(await page.locator('#pagar-usd').innerText()), 'falta una de las dos monedas');
+  check('el panel muestra lo que se va acumulando',
+        /S\//.test(await page.locator('#acum-monto').innerText()));
+
+  actual = 'nuevo-consumos';
+  await page.goto(`${BASE}/nuevo`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  check('la lista de consumos está oculta al inicio',
+        !(await page.locator('#bloque-consumos').isVisible()));
+  await page.click('label[for="tarjeta"]');
+  await page.waitForTimeout(1600);
+  check('al elegir Tarjeta aparece la lista del período',
+        (await page.locator('#bc-body tr').count()) > 0);
+
   console.log('\n=== 5. Seguridad: XSS en descripciones ===');
   actual = 'xss';
   await page.goto(`${BASE}/nuevo`, { waitUntil: 'networkidle' });

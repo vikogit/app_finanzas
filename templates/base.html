@@ -458,6 +458,45 @@
     }
     .btn-cancel:hover { color: var(--text); background: var(--border); }
 
+    /* ─── Lista de consumos con tarjeta (Tarjeta y Nuevo movimiento) ─── */
+    .consumo-fila td { padding: 11px 16px; vertical-align: middle; }
+    /* Rojo = aún no has apartado el dinero. Verde = ya lo tienes. */
+    .consumo-pend td, .consumo-pend .consumo-desc { color: #f87171; }
+    .consumo-ok   td, .consumo-ok   .consumo-desc { color: #4ade80; }
+    .consumo-ok .consumo-desc { text-decoration: none; }
+    .consumo-monto { font-weight: 700; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .consumo-dias {
+      display: inline-block; margin-left: 7px; padding: 1px 7px; border-radius: 99px;
+      font-size: 10px; font-weight: 700; background: rgba(239,68,68,0.16); color: #fca5a5;
+    }
+    .consumo-check {
+      width: 19px; height: 19px; cursor: pointer; accent-color: #22c55e; flex-shrink: 0;
+    }
+    .consumo-check-wrap { display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .consumo-estado { font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+    /* Detalle de la compra dentro del modal de confirmación */
+    .mc-detalle {
+      display: grid; grid-template-columns: auto 1fr; gap: 8px 16px;
+      padding: 14px 16px; margin-bottom: 18px; border-radius: 12px;
+      background: var(--bg-card2); border: 1px solid var(--border2); font-size: 13px;
+    }
+    .mc-detalle dt { color: var(--text-muted); font-size: 12px; }
+    .mc-detalle dd { color: var(--text); font-weight: 600; text-align: right; word-break: break-word; }
+    .mc-detalle .mc-monto { font-size: 15px; font-weight: 800; }
+    .btn-submit.mc-peligro { background: linear-gradient(135deg,#ef4444,#b91c1c); }
+
+    .consumos-resumen {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      padding: 12px 16px; border-bottom: 1px solid var(--border2); font-size: 12.5px;
+    }
+    .consumos-chip {
+      padding: 4px 11px; border-radius: 99px; font-weight: 700; font-size: 12px;
+    }
+    .chip-total { background: var(--bg-card2); color: var(--text); }
+    .chip-ok    { background: rgba(34,197,94,0.14); color: #4ade80; }
+    .chip-pend  { background: rgba(239,68,68,0.14); color: #f87171; }
+
     /* ─── Esqueleto mientras cargan los datos ─── */
     .kpi-value.cargando, .resultado-val.cargando {
       color: transparent !important; border-radius: 7px; min-height: 1em;
@@ -715,6 +754,24 @@
   <main class="main">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Confirmación del check "ya tengo el dinero" (Tarjeta y Nuevo movimiento) -->
+  <div class="modal-overlay" id="modal-consumo">
+    <div class="modal-card">
+      <div class="modal-title" id="mc-titulo">¿Ya tienes el dinero de esta compra?</div>
+      <div class="modal-sub" id="mc-sub"></div>
+      <dl class="mc-detalle">
+        <dt>Fecha</dt><dd id="mc-fecha"></dd>
+        <dt>Compra</dt><dd id="mc-desc"></dd>
+        <dt>Categoría</dt><dd id="mc-cat"></dd>
+        <dt>Monto</dt><dd id="mc-monto" class="mc-monto"></dd>
+      </dl>
+      <div class="form-actions">
+        <button type="button" class="btn-submit" id="mc-confirmar">Sí, tengo el dinero</button>
+        <button type="button" class="btn-cancel" id="mc-cancelar">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -893,6 +950,102 @@
 
   function fechaInicioDe(dashboard) {
     return FECHA_INICIO_POR_DASHBOARD[dashboard] || getDefaultDates().desde;
+  }
+
+  /* ─── Consumos con tarjeta: lista + check "ya tengo el dinero" ───
+     Se usa igual en el dashboard de Tarjeta y en Nuevo movimiento, así que
+     vive aquí una sola vez. */
+  function fmtFechaCorta(iso) {
+    const [a, m, d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+  }
+
+  function pintarConsumosTarjeta(tbodyId, consumos, alCambiar) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!consumos.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:26px;text-align:center;color:var(--text-subtle);font-size:13px">
+        No hay consumos con tarjeta en este período.</td></tr>`;
+      return;
+    }
+
+    for (const c of consumos) {
+      const tr = document.createElement('tr');
+      tr.className = `consumo-fila ${c.dinero_separado ? 'consumo-ok' : 'consumo-pend'}`;
+      tr.dataset.id = c.id;
+
+      const alerta = (!c.dinero_separado && c.dias_sin_separar > 5)
+        ? `<span class="consumo-dias" title="Llevas ${c.dias_sin_separar} días sin apartar este dinero">${c.dias_sin_separar} d</span>` : '';
+
+      tr.innerHTML = `
+        <td style="white-space:nowrap">${fmtFechaCorta(c.fecha)}</td>
+        <td class="consumo-desc"></td>
+        <td><span class="badge-cat">${c.categoria === 'R&D' ? 'R & D' : c.categoria}</span></td>
+        <td class="consumo-monto">${fmtSoles(c.importe)}${alerta}</td>
+        <td>
+          <div class="consumo-check-wrap">
+            <input type="checkbox" class="consumo-check" ${c.dinero_separado ? 'checked' : ''}
+                   aria-label="Marcar que ya tengo el dinero de este consumo">
+            <span class="consumo-estado">${c.dinero_separado ? 'Tengo el dinero' : 'Sin dinero'}</span>
+          </div>
+        </td>`;
+      // textContent: una descripción nunca debe poder inyectar HTML.
+      tr.querySelector('.consumo-desc').textContent = c.descripcion;
+
+      tr.querySelector('.consumo-check').addEventListener('change', ev => {
+        const quiere = ev.target.checked;
+        ev.target.checked = !quiere;          // no se mueve hasta confirmar
+        confirmarDineroConsumo(c, quiere, alCambiar);
+      });
+      tbody.appendChild(tr);
+    }
+  }
+
+  /* Pregunta antes de registrar, mostrando la compra concreta. */
+  function confirmarDineroConsumo(consumo, separado, alCambiar) {
+    const modal = document.getElementById('modal-consumo');
+    document.getElementById('mc-titulo').textContent =
+      separado ? '¿Ya tienes el dinero de esta compra?' : '¿Quitar el registro de dinero?';
+    document.getElementById('mc-sub').textContent = separado
+      ? 'Confirma que apartaste el dinero para pagar este consumo cuando venza la tarjeta.'
+      : 'El consumo volverá a aparecer en rojo como pendiente de respaldo.';
+    document.getElementById('mc-fecha').textContent = fmtFechaCorta(consumo.fecha);
+    document.getElementById('mc-desc').textContent = consumo.descripcion;
+    document.getElementById('mc-cat').textContent = consumo.categoria === 'R&D' ? 'R & D' : consumo.categoria;
+    document.getElementById('mc-monto').textContent = fmtSoles(consumo.importe);
+
+    const btn = document.getElementById('mc-confirmar');
+    btn.textContent = separado ? 'Sí, tengo el dinero' : 'Sí, quitarlo';
+    btn.className = 'btn-submit' + (separado ? '' : ' mc-peligro');
+
+    const cerrar = () => {
+      modal.classList.remove('open');
+      btn.onclick = null;
+    };
+    btn.onclick = () => {
+      btn.disabled = true;
+      fetch(`/api/tarjeta/consumos/${consumo.id}/dinero`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ separado }),
+      })
+        .then(async r => {
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'No se pudo guardar');
+          cerrar();
+          mostrarAviso(separado
+            ? `Registrado: ya tienes el dinero de "${consumo.descripcion}".`
+            : `"${consumo.descripcion}" vuelve a quedar sin respaldo.`, separado ? 'ok' : 'error');
+          if (alCambiar) alCambiar();
+        })
+        .catch(e => { cerrar(); mostrarAviso(e.message); })
+        .finally(() => { btn.disabled = false; });
+    };
+    document.getElementById('mc-cancelar').onclick = cerrar;
+    modal.onclick = e => { if (e.target === modal) cerrar(); };
+    modal.classList.add('open');
+    btn.focus();
   }
 
   /* ─── Metas mensuales: CRUD compartido ───
