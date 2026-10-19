@@ -259,9 +259,13 @@ def seed_presupuesto_si_vacio():
 # con datos: db.create_all() no las añade (la tabla ya está), hay que pedirlas
 # aparte. Al agregar una columna nueva al modelo, anotarla también aquí.
 COLUMNAS_AGREGADAS = [
-    ("movimientos", "pagado_con_tarjeta", "BOOLEAN NOT NULL DEFAULT FALSE"),
-    ("movimientos", "dinero_separado",    "BOOLEAN NOT NULL DEFAULT FALSE"),
-    ("movimientos", "dinero_separado_el", "DATE"),
+    # En el orden en que se fueron agregando. Las dos primeras nunca tuvieron
+    # su ALTER: la tabla en producción puede seguir sin ellas.
+    ("movimientos", "investment_asset_type", "VARCHAR(50)"),
+    ("movimientos", "investment_asset_name", "VARCHAR(100)"),
+    ("movimientos", "pagado_con_tarjeta",    "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("movimientos", "dinero_separado",       "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("movimientos", "dinero_separado_el",    "DATE"),
 ]
 
 

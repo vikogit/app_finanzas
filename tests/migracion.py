@@ -31,7 +31,9 @@ def check(etiqueta, cond, detalle=""):
 
 
 # ── 1. base con el esquema anterior y una fila dentro ─────────────────
-# Las columnas son las de `movimientos` antes de agregar dinero_separado.
+# Estas son las columnas con las que nació `movimientos`: es el esquema que
+# tiene la base de producción, que se quedó en el despliegue de junio de 2026.
+# Desde entonces el modelo ganó cinco columnas, y ninguna está en la tabla.
 ESQUEMA_VIEJO = """
 CREATE TABLE movimientos (
     id INTEGER PRIMARY KEY,
@@ -39,13 +41,10 @@ CREATE TABLE movimientos (
     tipo VARCHAR(20) NOT NULL,
     categoria VARCHAR(30) NOT NULL,
     descripcion VARCHAR(255) NOT NULL,
-    importe NUMERIC(10,2) NOT NULL,
-    investment_asset_type VARCHAR(50),
-    investment_asset_name VARCHAR(100),
-    pagado_con_tarjeta BOOLEAN NOT NULL DEFAULT FALSE
+    importe NUMERIC(10,2) NOT NULL
 );
-INSERT INTO movimientos (fecha, tipo, categoria, descripcion, importe, pagado_con_tarjeta)
-VALUES ('2026-10-10', 'Gasto', 'Tarjeta', 'Netflix', 44.90, 1);
+INSERT INTO movimientos (fecha, tipo, categoria, descripcion, importe)
+VALUES ('2026-10-10', 'Gasto', 'Tarjeta', 'Netflix', 44.90);
 """
 
 
@@ -65,8 +64,10 @@ def main():
 
     print("=== 1. Base con el esquema viejo ===")
     antes = columnas_de()
-    check("la base arranca sin las columnas nuevas",
-          "dinero_separado" not in antes and "dinero_separado_el" not in antes, str(antes))
+    nuevas = ["investment_asset_type", "investment_asset_name", "pagado_con_tarjeta",
+              "dinero_separado", "dinero_separado_el"]
+    check("la base arranca sin ninguna de las columnas nuevas",
+          not [c for c in nuevas if c in antes], str(antes))
 
     # ── 2. importar la app la migra en el arranque ────────────────────
     print("\n=== 2. El arranque aplica el esquema ===")
@@ -78,7 +79,7 @@ def main():
     import app as appmod  # noqa: E402  (tiene que importarse con el entorno ya puesto)
 
     despues = columnas_de()
-    for columna in ("dinero_separado", "dinero_separado_el"):
+    for columna in nuevas:
         check(f"agregó {columna}", columna in despues, str(despues))
 
     con = sqlite3.connect(BD)
