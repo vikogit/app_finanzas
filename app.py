@@ -1594,6 +1594,11 @@ def api_tarjeta():
         c["vencimiento"] = c["vencimiento"].strftime("%Y-%m-%d")
 
     ciclo_actual = next((c for c in ciclos if c["cid"] == ciclo_actual_cid), None)
+    # Ciclos que todavía deben dinero. Un estado de cuenta ya pagado no debe
+    # seguir contando: el dinero que apartaste para él no respalda lo que aún
+    # debes, y avisar que no "registraste el dinero" de un consumo que ya
+    # pagaste es ruido.
+    cids_con_saldo = {c["cid"] for c in ciclos if c["saldo"] > 0.001}
     for c in ciclos:
         del c["cid"]
     ciclos.sort(key=lambda c: c["inicio"], reverse=True)
@@ -1697,7 +1702,8 @@ def api_tarjeta():
     # ── Salud: qué parte de lo que debes ya tiene su dinero apartado ──
     deuda_total = round(sum(c["saldo"] for c in ciclos), 2)
     separado_total = round(sum(
-        float(m.importe) for m in cargos_movs if m.dinero_separado), 2)
+        float(m.importe) for m in cargos_movs
+        if m.dinero_separado and ciclo_de_fecha(m.fecha) in cids_con_saldo), 2)
     cubierto = min(separado_total, deuda_total)
     pct_cubierto = round(cubierto / deuda_total * 100) if deuda_total > 0.001 else 100
     if deuda_total <= 0.001:
@@ -1717,7 +1723,8 @@ def api_tarjeta():
         "descripcion": m.descripcion, "importe": float(m.importe),
         "dias": (hoy - m.fecha).days,
     } for m in sorted(cargos_movs, key=lambda x: x.fecha)
-        if not m.dinero_separado and (hoy - m.fecha).days > DIAS_ALERTA_SIN_SEPARAR]
+        if not m.dinero_separado and (hoy - m.fecha).days > DIAS_ALERTA_SIN_SEPARAR
+        and ciclo_de_fecha(m.fecha) in cids_con_saldo]
 
     # ── Datos de los gráficos generales (no dependen del filtro de ciclo) ──
     por_ciclo_graf = []

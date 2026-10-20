@@ -119,7 +119,7 @@
 <div class="pagar-card pagar-normal" id="pagar-card">
   <div class="pagar-top">
     <div>
-      <div class="pagar-rotulo">Tienes una deuda de</div>
+      <div class="pagar-rotulo" id="pagar-rotulo">Tienes una deuda de</div>
       <div class="pagar-monto" id="pagar-monto">S/ —</div>
       <div class="pagar-usd" id="pagar-usd"></div>
       <div class="pagar-periodo" id="pagar-periodo"></div>
@@ -305,9 +305,43 @@ function fmtFechaLarga(iso) {
 }
 
 /* ── Panel de "lo que toca pagar" ─────────────────────────────────── */
-function pintarPorPagar(pp) {
+function pintarPorPagar(pp, acum) {
   const card = document.getElementById('pagar-card');
   const barraWrap = document.getElementById('pagar-barra-wrap');
+  const rotulo = document.getElementById('pagar-rotulo');
+  const bloqueAcum = document.getElementById('pagar-acumula');
+
+  /* Sin estados de cuenta cerrados por pagar, lo que importa es el ciclo
+     abierto: cuánto llevas, hasta cuándo se paga y qué parte ya tiene su
+     dinero. Decir "S/ 0.00 · todo al día" escondería justo ese número. */
+  if (!pp && acum && acum.total > 0.009) {
+    const falta = Math.max(0, +(acum.total - acum.separado).toFixed(2));
+    const cubierto = falta <= 0.009;
+    card.className = 'pagar-card ' + (cubierto ? 'pagar-ok' : 'pagar-normal');
+    rotulo.textContent = 'Tu estado de cuenta en curso';
+    const monto = document.getElementById('pagar-monto');
+    monto.textContent = fmtSoles(acum.total);
+    monto.style.color = cubierto ? '#4ade80' : '#a78bfa';
+    document.getElementById('pagar-usd').textContent = acum.total_usd != null
+      ? `≈ $ ${acum.total_usd.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2})}`
+      : '';
+    document.getElementById('pagar-periodo').textContent = `Consumos del período ${acum.periodo}`;
+    document.getElementById('pagar-fecha').textContent = fmtFechaLarga(acum.vencimiento);
+    const cuA = document.getElementById('pagar-cuenta');
+    cuA.textContent = acum.dias_para_cierre >= 0
+      ? `Cierra en ${acum.dias_para_cierre} día(s)` : 'Ciclo cerrado';
+    cuA.className = 'pagar-cuenta cuenta-normal';
+    barraWrap.style.display = '';
+    document.getElementById('pagar-barra').style.width =
+      (acum.total > 0 ? Math.min(100, acum.separado / acum.total * 100) : 100) + '%';
+    document.getElementById('pagar-tengo').textContent = fmtSoles(acum.separado);
+    document.getElementById('pagar-falta').textContent = fmtSoles(falta);
+    document.getElementById('pagar-otros').style.display = 'none';
+    bloqueAcum.style.display = 'none';   // ya está arriba: no repetirlo
+    return;
+  }
+  bloqueAcum.style.display = '';
+  rotulo.textContent = 'Tienes una deuda de';
 
   if (!pp) {
     card.className = 'pagar-card pagar-ok';
@@ -531,7 +565,7 @@ function cargar(cicloId) {
       ciclosDisponibles = data.ciclos_disponibles;
       cicloActualId = data.ciclo_sel.id;
 
-      pintarPorPagar(data.por_pagar);
+      pintarPorPagar(data.por_pagar, data.acumulando);
       pintarAcumulando(data.acumulando);
       pintarSalud(data.salud);
       pintarAlertas(data.alertas);
