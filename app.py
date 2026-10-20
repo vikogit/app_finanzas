@@ -1637,6 +1637,30 @@ def api_tarjeta():
     sel_total     = round(sum(c["importe"] for c in consumos_json), 2)
     sel_separado  = round(sum(c["importe"] for c in consumos_json if c["dinero_separado"]), 2)
 
+    # ── Día a día: cómo se fue acumulando este estado de cuenta ────────
+    # Deja ver crecer lo que se pagará el mes siguiente, y qué parte de esa
+    # cuesta ya tiene su dinero. El ciclo abierto se dibuja sólo hasta hoy:
+    # proyectar días que aún no ocurren sería inventar deuda.
+    tope = min(cie_sel, hoy) if ini_sel <= hoy else cie_sel
+    cargos_del_dia, separado_del_dia = defaultdict(float), defaultdict(float)
+    for m in consumos:
+        cargos_del_dia[m.fecha] += float(m.importe)
+        if m.dinero_separado:
+            separado_del_dia[m.fecha] += float(m.importe)
+
+    acumulado_diario = []
+    acc = acc_sep = 0.0
+    dia = ini_sel
+    while dia <= tope:
+        acc     += cargos_del_dia.get(dia, 0.0)
+        acc_sep += separado_del_dia.get(dia, 0.0)
+        acumulado_diario.append({
+            "fecha": dia.strftime("%Y-%m-%d"),
+            "acumulado": round(acc, 2),
+            "separado": round(acc_sep, 2),
+        })
+        dia += timedelta(days=1)
+
     # Lista de ciclos para el selector: los que tienen consumos + el actual.
     cids_sel = sorted(set(cargos_por_ciclo.keys()) | {ciclo_actual_cid, cid_sel}, reverse=True)
     ciclos_disponibles = []
@@ -1679,6 +1703,8 @@ def api_tarjeta():
             "tipo_cambio": tc,
             "separado": min(separado_p, c["saldo"]),
             "falta": round(max(0.0, c["saldo"] - separado_p), 2),
+            # Repartido entre los días que quedan hasta el vencimiento.
+            "por_dia": round(max(0.0, c["saldo"] - separado_p) / max(1, (venc - hoy).days), 2),
             # Si hay más estados de cuenta cerrados sin pagar, no deben quedar
             # escondidos detrás del más urgente.
             "otros_pendientes": round(
@@ -1689,14 +1715,22 @@ def api_tarjeta():
     # siguiente a su cierre. Es "lo que se te viene".
     ini_a, cie_a, ven_a = ciclo_bounds(*ciclo_actual_cid)
     total_a = round(sum(float(m.importe) for m in cargos_movs if ini_a <= m.fecha <= cie_a), 2)
+    separado_a  = _separado_de(ciclo_actual_cid)
+    falta_a     = round(max(0.0, total_a - separado_a), 2)
+    dias_pago_a = (ven_a - hoy).days
     acumulando = {
         "periodo": ciclo_etiqueta(ini_a, cie_a),
         "cierra": cie_a.strftime("%Y-%m-%d"),
         "vencimiento": ven_a.strftime("%Y-%m-%d"),
         "total": total_a,
         "total_usd": round(total_a / tc, 2) if tc else None,
-        "separado": _separado_de(ciclo_actual_cid),
+        "separado": separado_a,
+        "falta": falta_a,
         "dias_para_cierre": (cie_a - hoy).days,
+        # Lo que falta, repartido entre los días que quedan hasta pagarlo:
+        # es la cuota diaria para llegar al vencimiento con el dinero listo.
+        "dias_para_pago": dias_pago_a,
+        "por_dia": round(falta_a / dias_pago_a, 2) if dias_pago_a > 0 else falta_a,
     }
 
     # ── Salud: qué parte de lo que debes ya tiene su dinero apartado ──
@@ -1764,6 +1798,7 @@ def api_tarjeta():
             "separado": sel_separado,
             "sin_separar": round(sel_total - sel_separado, 2),
             "consumos": consumos_json,
+            "acumulado_diario": acumulado_diario,
         },
         "ciclos_disponibles": ciclos_disponibles,
         "por_pagar": por_pagar,
