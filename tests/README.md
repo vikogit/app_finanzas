@@ -72,6 +72,19 @@ Es la red contra el fallo que tiró producción: agregar una columna al modelo
 y desplegar sin que la base la tenga. Si agregas una columna nueva, anótala en
 `COLUMNAS_AGREGADAS` (en `app.py`) y corre esta suite.
 
+## 4. Cuadre de la tarjeta — `cuadre_tarjeta.py`
+
+```bash
+python tests/cuadre_tarjeta.py
+```
+
+Reproduce la base de producción de octubre de 2026 (estados de cuenta viejos
+que nunca se registraron como pagados y un ciclo en curso incompleto), aplica
+`/cuadrar-tarjeta` y comprueba contra `/api/tarjeta` que el dashboard queda en
+su estado real: la deuda del período que se paga el 20/11, cuánto está
+cubierto y cuánto falta. También comprueba que el GET no escribe nada, que no
+se borra historial y que repetirlo no duplica movimientos.
+
 ## Datos de ejemplo
 
 `servidor_pruebas.py` rehace la base en cada arranque con movimientos de

@@ -548,6 +548,136 @@ def ciclo_etiqueta(inicio, cierre):
     return f"{inicio.day} {MESES_ES[inicio.month][:3].lower()} → {cierre.day} {MESES_ES[cierre.month][:3].lower()}"
 
 
+# ── Cuadre puntual de la tarjeta ──────────────────────────────────────
+# Situación concreta de octubre de 2026: los estados de cuenta cerrados
+# hasta el 25/09 ya se pagaron en el banco, pero esos pagos nunca se
+# registraron acá, así que la app seguía mostrando una deuda que ya no
+# existe. Y del ciclo en curso faltan consumos por registrar: su total real
+# es CUADRE_TOTAL, del cual CUADRE_CON_DINERO ya tiene su dinero apartado.
+#
+# El faltante se agrega como dos consumos llamados "cuadre" (uno con dinero
+# y otro sin él) en vez de inventar compras que no ocurrieron, y lo viejo se
+# salda registrando el pago que faltaba, sin borrar historial. Es una ruta
+# manual: no corre sola al desplegar, y se puede repetir sin duplicar nada.
+CUADRE_CORTE      = date_type(2026, 9, 25)   # lo cerrado hasta aquí, ya pagado
+CUADRE_CICLO      = (2026, 10)               # ciclo 26 sep → 25 oct
+CUADRE_TOTAL      = 1465.46                  # a pagar el 20/11/2026
+CUADRE_CON_DINERO = 1347.60                  # de eso, lo ya apartado
+CUADRE_ETIQUETA   = "cuadre"
+CUADRE_NOTA_PAGO  = "Pago de los estados de cuenta cerrados hasta el 25/09/2026"
+CUADRE_NOTA_FONDO = "Dinero usado para pagar los estados de cuenta anteriores"
+
+
+def _consumos_tarjeta(desde=None, hasta=None):
+    q = Movimiento.query.filter(
+        Movimiento.tipo == "Gasto",
+        db.or_(Movimiento.pagado_con_tarjeta.is_(True), Movimiento.categoria == "Tarjeta"))
+    if desde is not None:
+        q = q.filter(Movimiento.fecha >= desde)
+    if hasta is not None:
+        q = q.filter(Movimiento.fecha <= hasta)
+    return q.all()
+
+
+def cuadre_tarjeta_plan():
+    """Qué haría el cuadre, sin tocar nada: para enseñarlo antes de aplicarlo."""
+    ini, cie, ven = ciclo_bounds(*CUADRE_CICLO)
+
+    # Los pagos se aplican al ciclo pendiente más antiguo primero, así que
+    # todo lo pagado hasta hoy ya descontó de los estados de cuenta viejos.
+    viejos = sum(float(m.importe) for m in _consumos_tarjeta(hasta=CUADRE_CORTE))
+    pagado = sum(float(m.importe) for m in Movimiento.query.filter(
+        Movimiento.tipo == "Ingreso", Movimiento.categoria == "Tarjeta").all())
+    pagado += sum(float(p.monto) for p in PagoTarjeta.query.all())
+
+    del_ciclo = [m for m in _consumos_tarjeta(ini, cie) if m.descripcion != CUADRE_ETIQUETA]
+    real = round(sum(float(m.importe) for m in del_ciclo), 2)
+    return {
+        "periodo": ciclo_etiqueta(ini, cie),
+        "vencimiento": ven.strftime("%d/%m/%Y"),
+        "saldo_viejo": round(max(0.0, viejos - pagado), 2),
+        "consumos": len(del_ciclo),
+        "reales": real,
+        "cuadre_con_dinero": round(CUADRE_CON_DINERO - real, 2),
+        "cuadre_sin_dinero": round(CUADRE_TOTAL - CUADRE_CON_DINERO, 2),
+        "total": CUADRE_TOTAL,
+        "con_dinero": CUADRE_CON_DINERO,
+        # Si los consumos reales ya pasan la meta, sumar no alcanza: habría
+        # que desmarcar a mano, y eso no lo decide esta ruta.
+        "excede": real > CUADRE_CON_DINERO + 0.009,
+    }
+
+
+def aplicar_cuadre_tarjeta():
+    """Deja la tarjeta como está en la vida real. Repetirlo no duplica nada."""
+    plan = cuadre_tarjeta_plan()
+    ini, cie, _ven = ciclo_bounds(*CUADRE_CICLO)
+    hoy = hoy_local()
+    fecha_cuadre = min(max(hoy, ini), cie)   # siempre dentro del ciclo
+    notas = []
+
+    # 1. Saldar los estados de cuenta viejos con el pago que faltaba. El
+    #    aporte al fondo acompaña al pago para que "dinero apartado para la
+    #    tarjeta" no se desplome por un pago que sí tenía su respaldo.
+    if plan["saldo_viejo"] > 0.009:
+        db.session.add(Movimiento(fecha=hoy, tipo="Fondo", categoria="Tarjeta",
+                                  descripcion=CUADRE_NOTA_FONDO, importe=plan["saldo_viejo"]))
+        db.session.add(Movimiento(fecha=hoy, tipo="Ingreso", categoria="Tarjeta",
+                                  descripcion=CUADRE_NOTA_PAGO, importe=plan["saldo_viejo"]))
+        notas.append(f"Saldados S/ {plan['saldo_viejo']:,.2f} de estados de cuenta anteriores")
+    else:
+        notas.append("No quedaba saldo de estados de cuenta anteriores")
+
+    # 2. El ciclo en curso: sus consumos quedan con su dinero y los "cuadre"
+    #    de una corrida anterior se rehacen desde cero.
+    for m in _consumos_tarjeta(ini, cie):
+        if m.descripcion == CUADRE_ETIQUETA:
+            db.session.delete(m)
+        else:
+            m.dinero_separado = True
+            m.dinero_separado_el = hoy
+    notas.append(f"{plan['consumos']} consumo(s) del período quedaron con su dinero apartado")
+
+    # 3. Los dos "cuadre" llevan el ciclo a su total real y dejan a la vista
+    #    lo que todavía falta reunir.
+    if plan["excede"]:
+        notas.append(
+            f"Los consumos reales (S/ {plan['reales']:,.2f}) ya superan "
+            f"S/ {plan['con_dinero']:,.2f}: no se agregó cuadre con dinero")
+    elif plan["cuadre_con_dinero"] > 0.009:
+        db.session.add(Movimiento(
+            fecha=fecha_cuadre, tipo="Gasto", categoria="Tarjeta", descripcion=CUADRE_ETIQUETA,
+            importe=plan["cuadre_con_dinero"], dinero_separado=True, dinero_separado_el=hoy))
+        notas.append(f"Cuadre con dinero: S/ {plan['cuadre_con_dinero']:,.2f}")
+
+    if plan["cuadre_sin_dinero"] > 0.009:
+        db.session.add(Movimiento(
+            fecha=fecha_cuadre, tipo="Gasto", categoria="Tarjeta", descripcion=CUADRE_ETIQUETA,
+            importe=plan["cuadre_sin_dinero"], dinero_separado=False))
+        notas.append(f"Cuadre sin dinero (lo que falta reunir): S/ {plan['cuadre_sin_dinero']:,.2f}")
+
+    db.session.commit()
+    return notas
+
+
+@app.route("/cuadrar-tarjeta", methods=["GET", "POST"])
+@login_requerido
+def cuadrar_tarjeta():
+    """Mira el cuadre con GET y lo aplica con POST.
+
+    Separar las dos cosas evita que un prefetch del navegador escriba en la
+    base sin que nadie lo haya pedido.
+    """
+    if request.method == "POST":
+        try:
+            notas = aplicar_cuadre_tarjeta()
+        except Exception as e:
+            db.session.rollback()
+            return render_template("cuadre_tarjeta.html", error=sin_credenciales(e)), 500
+        return render_template("cuadre_tarjeta.html", notas=notas)
+    return render_template("cuadre_tarjeta.html", plan=cuadre_tarjeta_plan())
+
+
 # ── page routes ───────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET", "POST"])

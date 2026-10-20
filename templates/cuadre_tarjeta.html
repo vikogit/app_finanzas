@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Cuadrar tarjeta — App Finanzas{% endblock %}
+
+{% block content %}
+<style>
+  .cuadre-wrap { max-width: 680px; }
+  .cuadre-lista { list-style: none; padding: 0; margin: 0 0 22px; }
+  .cuadre-lista li {
+    display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+    font-size: 13.5px; color: var(--text-muted);
+  }
+  .cuadre-lista li:last-child { border-bottom: 0; }
+  .cuadre-lista b { color: var(--text); font-weight: 700; }
+  .cuadre-objetivo {
+    margin: 4px 0 22px; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid rgba(124,58,237,0.32); background: rgba(124,58,237,0.09);
+    font-size: 13.5px; color: var(--text-muted); line-height: 1.75;
+  }
+  .cuadre-objetivo b { color: var(--text); }
+  .cuadre-ok { color: #4ade80; } .cuadre-falta { color: #f87171; }
+  .cuadre-aviso {
+    margin-bottom: 20px; padding: 13px 15px; border-radius: 12px;
+    border: 1px solid rgba(251,191,36,0.34); background: rgba(251,191,36,0.09);
+    font-size: 13px; color: #fbbf24; line-height: 1.65;
+  }
+  .cuadre-error {
+    padding: 14px 16px; border-radius: 12px; margin-bottom: 20px;
+    border: 1px solid rgba(248,113,113,0.4); background: rgba(248,113,113,0.1);
+    color: #f87171; font-size: 13.5px;
+  }
+  .cuadre-hechas { list-style: none; padding: 0; margin: 0 0 22px; }
+  .cuadre-hechas li {
+    padding: 9px 0 9px 24px; position: relative; font-size: 13.5px; color: var(--text-muted);
+  }
+  .cuadre-hechas li::before {
+    content: '✓'; position: absolute; left: 0; color: #4ade80; font-weight: 700;
+  }
+  .cuadre-botones { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+  .cuadre-botones .btn-submit { flex: 0 0 auto; }
+  a.btn-submit { display: inline-flex; align-items: center; text-decoration: none; }
+</style>
+
+<div class="page-hdr">
+  <h1 class="page-title">Cuadrar la tarjeta</h1>
+  <p class="page-sub">Deja el estado de cuenta igual a como está en el banco</p>
+</div>
+
+<div class="card card-p cuadre-wrap">
+  {% if error %}
+    <div class="cuadre-error">No se pudo aplicar: {{ error }}</div>
+    <a class="btn-cancel" href="{{ url_for('cuadrar_tarjeta') }}">Volver a intentar</a>
+
+  {% elif notas %}
+    <p style="font-size:14px;color:var(--text);margin:0 0 16px">Listo. Esto es lo que se hizo:</p>
+    <ul class="cuadre-hechas">
+      {% for nota in notas %}<li>{{ nota }}</li>{% endfor %}
+    </ul>
+    <div class="cuadre-botones">
+      <a class="btn-submit" href="{{ url_for('dashboard_tarjeta') }}">Ver el dashboard de Tarjeta</a>
+    </div>
+
+  {% else %}
+    <div class="cuadre-objetivo">
+      Tu estado de cuenta del período <b>{{ plan.periodo }}</b>, que se paga hasta el
+      <b>{{ plan.vencimiento }}</b>, quedará así:<br>
+      Deuda <b>S/ {{ '{:,.2f}'.format(plan.total) }}</b> ·
+      <span class="cuadre-ok">ya tengo <b>S/ {{ '{:,.2f}'.format(plan.con_dinero) }}</b></span> ·
+      <span class="cuadre-falta">me falta <b>S/ {{ '{:,.2f}'.format(plan.cuadre_sin_dinero) }}</b></span>
+    </div>
+
+    <ul class="cuadre-lista">
+      <li><span>Estados de cuenta cerrados hasta el 25/09/2026 que aún figuran sin pagar</span>
+          <b>S/ {{ '{:,.2f}'.format(plan.saldo_viejo) }}</b></li>
+      <li><span>Se registrará el pago que faltaba (no se borra ningún movimiento)</span>
+          <b>{% if plan.saldo_viejo > 0 %}Sí{% else %}No hace falta{% endif %}</b></li>
+      <li><span>Consumos reales del período {{ plan.periodo }}</span>
+          <b>{{ plan.consumos }} · S/ {{ '{:,.2f}'.format(plan.reales) }}</b></li>
+      <li><span>Quedarán marcados como "ya tengo el dinero"</span>
+          <b>Los {{ plan.consumos }}</b></li>
+      <li><span>Consumo «cuadre» con dinero, para llegar al total real</span>
+          <b>S/ {{ '{:,.2f}'.format(plan.cuadre_con_dinero) }}</b></li>
+      <li><span>Consumo «cuadre» sin dinero, lo que falta reunir</span>
+          <b>S/ {{ '{:,.2f}'.format(plan.cuadre_sin_dinero) }}</b></li>
+    </ul>
+
+    {% if plan.excede %}
+      <div class="cuadre-aviso">
+        Tus consumos reales del período ya suman más de
+        S/ {{ '{:,.2f}'.format(plan.con_dinero) }}, así que no se puede llegar a esa cifra
+        sumando: no se agregará el cuadre con dinero. Revisa los montos antes de continuar.
+      </div>
+    {% endif %}
+
+    <div class="cuadre-aviso">
+      Se puede volver a ejecutar sin duplicar nada: los «cuadre» anteriores se rehacen
+      y el pago solo se registra si queda saldo. Para deshacerlo, borra desde Movimientos
+      los dos «cuadre» y el pago registrado hoy.
+    </div>
+
+    <form method="post" class="cuadre-botones">
+      <button type="submit" class="btn-submit">Aplicar el cuadre</button>
+      <a class="btn-cancel" href="{{ url_for('dashboard_tarjeta') }}">Cancelar</a>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
